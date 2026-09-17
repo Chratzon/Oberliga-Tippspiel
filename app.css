@@ -1,0 +1,345 @@
+/* Bully – Tippspiel Oberliga Süd
+   Farbwelt: Eisfläche, Bande, Blaue Linie, Mittellinie */
+
+:root {
+  --eis:        #E9F0F5;
+  --eis-hell:   #FFFFFF;
+  --bande:      #16232E;
+  --bande-weich:#22323F;
+  --blaulinie:  #1E5FA8;
+  --mittellinie:#C8102E;
+  --puck:       #0B0F13;
+  --grau:       #6F8698;
+  --grau-hell:  #C3D2DC;
+  --gold:       #B8862B;
+
+  --radius:     10px;
+  --spalte:     min(100%, 560px);
+  --tafel-h:    calc(56px + env(safe-area-inset-top));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --eis:      #101A22;
+    --eis-hell: #18252F;
+    --bande:    #0B131A;
+    --bande-weich:#1E2E3A;
+    --grau:     #8DA4B4;
+    --grau-hell:#33454F;
+    --puck:     #E8F0F5;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--eis);
+  color: var(--puck);
+  font-family: Archivo, "Segoe UI", system-ui, sans-serif;
+  font-variation-settings: "wdth" 100;
+  font-size: 16px;
+  line-height: 1.45;
+  padding-bottom: calc(68px + env(safe-area-inset-bottom));
+  overscroll-behavior-y: contain;
+}
+
+h2 { font-size: 1.25rem; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+h3 { font-size: 0.95rem; font-weight: 700; margin: 0 0 8px; }
+
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--blaulinie); outline-offset: 2px; border-radius: 4px; }
+
+/* ---------- Kopfleiste ---------- */
+
+.tafel {
+  position: sticky; top: 0; z-index: 30;
+  background: var(--bande);
+  color: #EAF2F7;
+  padding-top: env(safe-area-inset-top);
+  border-bottom: 3px solid var(--mittellinie);
+}
+
+.tafel-zeile {
+  width: var(--spalte); margin: 0 auto;
+  height: 56px; padding: 0 16px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.tafel-liga { display: flex; flex-direction: column; line-height: 1.1; }
+
+.tafel-liga-name {
+  font-variation-settings: "wdth" 118;
+  font-weight: 800; font-size: 1.05rem; letter-spacing: 0.01em;
+}
+
+.tafel-saison { font-size: 0.72rem; color: #8FA9BA; font-weight: 500; }
+
+.spieler-chip {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 1.5px solid #4A6274; background: transparent;
+  color: #EAF2F7; font-weight: 700; font-size: 0.85rem;
+  display: grid; place-items: center;
+}
+
+.sync-band {
+  width: var(--spalte); margin: 0 auto;
+  padding: 5px 16px 7px; font-size: 0.75rem; color: #8FA9BA;
+}
+.sync-band.ist-fehler { color: #F2A0A8; }
+
+/* ---------- Spieltag-Navigation ---------- */
+
+.view { width: var(--spalte); margin: 0 auto; padding: 0 16px; }
+
+.spieltag-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 0 10px;
+}
+
+.st-pfeil {
+  width: 42px; height: 42px; border-radius: 50%;
+  border: 1px solid var(--grau-hell); background: var(--eis-hell);
+  font-size: 1.4rem; line-height: 1; color: var(--grau);
+}
+.st-pfeil:disabled { opacity: 0.35; cursor: default; }
+
+.st-mitte { text-align: center; line-height: 1.15; }
+.st-label { display: block; font-size: 0.7rem; color: var(--grau); font-weight: 600; }
+.st-nummer {
+  font-variation-settings: "wdth" 120;
+  font-size: 1.9rem; font-weight: 800; letter-spacing: -0.02em;
+}
+.st-datum { display: block; font-size: 0.78rem; color: var(--grau); }
+
+/* ---------- Spiel ---------- */
+
+.spiele-liste { display: flex; flex-direction: column; gap: 10px; padding-bottom: 24px; }
+
+.spiel {
+  background: var(--eis-hell);
+  border: 1px solid var(--grau-hell);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.spiel.ist-gewertet { border-color: var(--blaulinie); }
+
+.spiel-kopf {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px 0;
+  font-size: 0.72rem; color: var(--grau); font-weight: 600;
+}
+.spiel-kopf .anpfiff { margin-left: auto; }
+.spiel-kopf .marke { color: var(--mittellinie); }
+
+.paarung {
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  align-items: center; gap: 8px;
+  padding: 6px 12px 10px;
+}
+
+.mannschaft { font-size: 0.92rem; font-weight: 600; line-height: 1.25; }
+.mannschaft.gast { text-align: right; }
+.mannschaft .kuerzel {
+  display: block; font-size: 0.68rem; color: var(--grau); font-weight: 500;
+}
+
+.endstand {
+  font-variation-settings: "wdth" 120;
+  font-weight: 800; font-size: 1.3rem;
+  background: var(--bande); color: #EAF2F7;
+  border-radius: 6px; padding: 3px 10px; min-width: 62px; text-align: center;
+}
+.endstand .zusatz {
+  display: block; font-size: 0.6rem; font-weight: 600;
+  color: #8FA9BA; font-variation-settings: "wdth" 100;
+}
+.endstand.ist-offen { background: transparent; color: var(--grau-hell); }
+
+/* ---------- Tippeingabe ---------- */
+
+.tipp-feld {
+  background: var(--bande);
+  padding: 12px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+.zaehler-reihe {
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px;
+}
+
+.zaehler { display: flex; align-items: center; justify-content: center; gap: 8px; }
+
+.zaehler button {
+  width: 34px; height: 34px; border-radius: 6px;
+  border: 1px solid #3D5466; background: var(--bande-weich);
+  color: #EAF2F7; font-size: 1.2rem; line-height: 1;
+}
+.zaehler button:active { background: var(--blaulinie); }
+.zaehler button:disabled { opacity: 0.3; }
+
+.zaehler output {
+  font-variation-settings: "wdth" 122;
+  font-size: 2rem; font-weight: 800; color: #FFFFFF;
+  min-width: 40px; text-align: center; font-variant-numeric: tabular-nums;
+}
+
+.doppelpunkt { color: #4A6274; font-weight: 800; font-size: 1.3rem; }
+
+.ausgang { display: flex; gap: 6px; }
+.ausgang button {
+  flex: 1; padding: 7px 4px; border-radius: 6px;
+  border: 1px solid #3D5466; background: transparent;
+  color: #8FA9BA; font-size: 0.78rem; font-weight: 600;
+}
+.ausgang button.ist-gewaehlt {
+  background: #EAF2F7; color: var(--bande); border-color: #EAF2F7;
+}
+.ausgang button:disabled { opacity: 0.4; }
+
+.tipp-fuss {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.75rem; color: #8FA9BA;
+}
+.tipp-fuss .punkte {
+  margin-left: auto; font-weight: 700; color: #EAF2F7;
+  background: var(--blaulinie); border-radius: 999px; padding: 2px 9px;
+}
+.tipp-fuss .punkte.ist-null { background: var(--bande-weich); color: #8FA9BA; }
+
+.tipp-gesperrt {
+  padding: 10px 12px; background: var(--bande-weich);
+  color: #8FA9BA; font-size: 0.78rem;
+  display: flex; align-items: center; gap: 8px;
+}
+.tipp-gesperrt .punkte {
+  margin-left: auto; font-weight: 700; color: #EAF2F7;
+  background: var(--blaulinie); border-radius: 999px; padding: 2px 9px;
+}
+.tipp-gesperrt .punkte.ist-null { background: transparent; border: 1px solid #3D5466; color: #8FA9BA; }
+
+/* ---------- Rangliste ---------- */
+
+.rang-kopf { padding: 16px 0 10px; }
+.rang-info { margin: 3px 0 0; font-size: 0.8rem; color: var(--grau); }
+
+.rangliste { list-style: none; margin: 0; padding: 0; }
+
+.rangliste li {
+  display: grid; grid-template-columns: 30px 1fr auto;
+  align-items: center; gap: 10px;
+  padding: 11px 4px;
+  border-bottom: 1px solid var(--grau-hell);
+}
+.rangliste li.bin-ich { background: rgba(30, 95, 168, 0.08); border-radius: 6px; }
+
+.rang-platz {
+  font-variation-settings: "wdth" 118;
+  font-weight: 800; font-size: 1.05rem; color: var(--grau);
+  font-variant-numeric: tabular-nums;
+}
+.rangliste li:first-child .rang-platz { color: var(--gold); }
+
+.rang-name { font-weight: 600; font-size: 0.95rem; }
+.rang-detail { font-size: 0.74rem; color: var(--grau); font-weight: 500; }
+
+.rang-punkte {
+  font-variation-settings: "wdth" 120;
+  font-weight: 800; font-size: 1.3rem; font-variant-numeric: tabular-nums;
+}
+
+.punkte-legende {
+  margin: 26px 0 30px; padding: 14px;
+  background: var(--eis-hell); border: 1px solid var(--grau-hell); border-radius: var(--radius);
+}
+.punkte-legende ul { margin: 0; padding: 0; list-style: none; }
+.punkte-legende li {
+  display: flex; gap: 10px; align-items: baseline;
+  padding: 5px 0; font-size: 0.85rem;
+}
+.punkte-legende b {
+  font-variation-settings: "wdth" 118;
+  min-width: 26px; color: var(--blaulinie); font-size: 1rem;
+}
+
+/* ---------- Profil ---------- */
+
+.feld-gruppe { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
+.feld { display: flex; flex-direction: column; gap: 5px; }
+.feld-label { font-size: 0.8rem; font-weight: 600; }
+.feld-hilfe { font-size: 0.74rem; color: var(--grau); }
+
+input[type="text"], textarea {
+  font: inherit; font-size: 0.95rem;
+  padding: 10px 12px; border-radius: 8px;
+  border: 1px solid var(--grau-hell); background: var(--eis-hell);
+  color: var(--puck); width: 100%;
+}
+textarea { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.8rem; resize: vertical; }
+
+.knopf {
+  padding: 10px 16px; border-radius: 8px;
+  border: 1px solid var(--bande); background: var(--bande); color: #EAF2F7;
+  font-weight: 600; font-size: 0.9rem;
+}
+.knopf-voll { width: 100%; }
+.knopf-still { background: transparent; color: var(--puck); border-color: var(--grau-hell); }
+.knopf-reihe { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+.block {
+  background: var(--eis-hell); border: 1px solid var(--grau-hell);
+  border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px;
+}
+.block summary { font-weight: 600; font-size: 0.92rem; cursor: pointer; }
+.block[open] summary { margin-bottom: 10px; }
+.block-text { font-size: 0.82rem; color: var(--grau); margin: 0 0 10px; }
+
+.admin-liste { display: flex; flex-direction: column; gap: 8px; max-height: 340px; overflow-y: auto; }
+.admin-zeile { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; font-size: 0.82rem; }
+.admin-zeile input { width: 44px; padding: 5px; text-align: center; }
+.admin-eingabe { display: flex; gap: 4px; align-items: center; }
+.admin-eingabe select { padding: 5px; border-radius: 6px; border: 1px solid var(--grau-hell); background: var(--eis-hell); color: var(--puck); }
+
+.daten-stand { font-size: 0.74rem; color: var(--grau); text-align: center; padding: 16px 0 30px; }
+
+.leer { color: var(--grau); font-size: 0.88rem; text-align: center; padding: 34px 20px; }
+
+/* ---------- Reiter ---------- */
+
+.reiter {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
+  display: flex; background: var(--eis-hell);
+  border-top: 1px solid var(--grau-hell);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.reiter-knopf {
+  flex: 1; border: none; background: none;
+  padding: 9px 2px 10px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  font-size: 0.68rem; font-weight: 600; color: var(--grau);
+  border-top: 2px solid transparent; margin-top: -1px;
+}
+.reiter-knopf svg {
+  width: 21px; height: 21px; fill: none;
+  stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
+.reiter-knopf.ist-aktiv { color: var(--blaulinie); border-top-color: var(--blaulinie); }
+
+/* ---------- Toast ---------- */
+
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%) translateY(20px);
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  background: var(--bande); color: #EAF2F7;
+  padding: 9px 18px; border-radius: 999px; font-size: 0.85rem; font-weight: 500;
+  opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 40;
+  max-width: 88vw; text-align: center;
+}
+.toast.ist-sichtbar { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "Bully – Tippspiel Oberliga Süd",
+  "short_name": "Bully",
+  "description": "Tippspiel für die DEB-Oberliga Süd, Saison 2026/27.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#E9F0F5",
+  "theme_color": "#16232E",
+  "lang": "de",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

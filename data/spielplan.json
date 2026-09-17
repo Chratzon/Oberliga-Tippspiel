@@ -1,0 +1,40 @@
+{
+  "saison": "2026/27",
+  "liga": "DEB-Oberliga Süd",
+  "modus": "Doppelrunde, 52 Spieltage, Hauptrunde bis 21.02.2027",
+  "standGeneriert": "2026-09-18",
+  "quelle": "Seed-Daten aus hockeyweb.de – wird vom Scraper vollständig überschrieben",
+  "teams": [
+    { "id": "deggendorf", "name": "Deggendorfer SC", "kurz": "DSC", "ort": "Deggendorf" },
+    { "id": "peiting", "name": "EC Peiting", "kurz": "PEI", "ort": "Peiting" },
+    { "id": "passau", "name": "EHF Passau Black Hawks", "kurz": "PAS", "ort": "Passau" },
+    { "id": "kaufbeuren", "name": "ESV Kaufbeuren", "kurz": "ESVK", "ort": "Kaufbeuren" },
+    { "id": "fuessen", "name": "EV Füssen", "kurz": "FÜS", "ort": "Füssen" },
+    { "id": "lindau", "name": "EV Lindau", "kurz": "LIN", "ort": "Lindau" },
+    { "id": "erding", "name": "Erding Gladiators", "kurz": "ERD", "ort": "Erding" },
+    { "id": "tigers", "name": "HC Tigers", "kurz": "TIG", "ort": "Tigers" },
+    { "id": "heilbronn", "name": "Heilbronner Falken", "kurz": "HEI", "ort": "Heilbronn" },
+    { "id": "hoechstadt", "name": "Höchstadt Alligators", "kurz": "HÖC", "ort": "Höchstadt" },
+    { "id": "riessersee", "name": "SC Riessersee", "kurz": "SCR", "ort": "Garmisch" },
+    { "id": "selb", "name": "Selber Wölfe", "kurz": "SEL", "ort": "Selb" },
+    { "id": "stuttgart", "name": "Stuttgart Rebels", "kurz": "STU", "ort": "Stuttgart" },
+    { "id": "badtoelz", "name": "Tölzer Löwen", "kurz": "TÖL", "ort": "Bad Tölz" }
+  ],
+  "spiele": [
+    { "id": "17428", "spieltag": 1, "datum": "2026-09-17", "zeit": null, "heim": "kaufbeuren", "gast": "badtoelz" },
+    { "id": "17429", "spieltag": 1, "datum": "2026-09-18", "zeit": "19:30", "heim": "riessersee", "gast": "passau" },
+    { "id": "17426", "spieltag": 1, "datum": "2026-09-18", "zeit": "19:30", "heim": "tigers", "gast": "selb" },
+    { "id": "17420", "spieltag": 1, "datum": "2026-09-18", "zeit": "19:30", "heim": "peiting", "gast": "stuttgart" },
+    { "id": "17432", "spieltag": 1, "datum": "2026-09-18", "zeit": "20:00", "heim": "erding", "gast": "fuessen" },
+    { "id": "17431", "spieltag": 1, "datum": "2026-09-18", "zeit": "20:00", "heim": "hoechstadt", "gast": "lindau" },
+    { "id": "17423", "spieltag": 1, "datum": "2026-09-18", "zeit": "20:00", "heim": "deggendorf", "gast": "heilbronn" },
+
+    { "id": "17419", "spieltag": 2, "datum": "2026-09-20", "zeit": "15:00", "heim": "heilbronn", "gast": "kaufbeuren" },
+    { "id": "17430", "spieltag": 2, "datum": "2026-09-20", "zeit": "16:00", "heim": "lindau", "gast": "deggendorf" },
+    { "id": "17417", "spieltag": 2, "datum": "2026-09-20", "zeit": "17:30", "heim": "selb", "gast": "peiting" },
+    { "id": "17413", "spieltag": 2, "datum": "2026-09-20", "zeit": "17:30", "heim": "stuttgart", "gast": "tigers" },
+    { "id": "17425", "spieltag": 2, "datum": "2026-09-20", "zeit": "18:00", "heim": "badtoelz", "gast": "erding" },
+    { "id": "17424", "spieltag": 2, "datum": "2026-09-20", "zeit": "18:00", "heim": "fuessen", "gast": "riessersee" },
+    { "id": "17418", "spieltag": 2, "datum": "2026-09-20", "zeit": "18:00", "heim": "passau", "gast": "hoechstadt" }
+  ]
+}

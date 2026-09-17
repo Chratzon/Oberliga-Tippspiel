@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16232E">
+<title>Bully – Tippspiel Oberliga Süd</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<header class="tafel">
+  <div class="tafel-zeile">
+    <div class="tafel-liga">
+      <span class="tafel-liga-name">Oberliga Süd</span>
+      <span class="tafel-saison">Saison 26/27</span>
+    </div>
+    <button id="btn-profil" class="spieler-chip" type="button" aria-label="Profil öffnen">
+      <span id="spieler-initial">?</span>
+    </button>
+  </div>
+  <div id="sync-band" class="sync-band" hidden></div>
+</header>
+
+<main id="inhalt">
+
+  <!-- ===== Tippen ===== -->
+  <section id="view-tippen" class="view">
+    <nav class="spieltag-nav">
+      <button id="st-zurueck" class="st-pfeil" type="button" aria-label="Vorheriger Spieltag">‹</button>
+      <div class="st-mitte">
+        <span class="st-label">Spieltag</span>
+        <span id="st-nummer" class="st-nummer">1</span>
+        <span id="st-datum" class="st-datum"></span>
+      </div>
+      <button id="st-vor" class="st-pfeil" type="button" aria-label="Nächster Spieltag">›</button>
+    </nav>
+    <div id="spiele-liste" class="spiele-liste"></div>
+    <p id="tippen-leer" class="leer" hidden>Für diesen Spieltag liegen noch keine Ansetzungen vor.</p>
+  </section>
+
+  <!-- ===== Tabelle ===== -->
+  <section id="view-tabelle" class="view" hidden>
+    <div class="rang-kopf">
+      <h2>Rangliste</h2>
+      <p id="rang-info" class="rang-info"></p>
+    </div>
+    <ol id="rangliste" class="rangliste"></ol>
+    <p id="rang-leer" class="leer" hidden>Noch keine gewerteten Spiele. Sobald die ersten Endstände da sind, füllt sich die Rangliste.</p>
+
+    <div class="punkte-legende">
+      <h3>So wird gewertet</h3>
+      <ul id="legende-liste"></ul>
+    </div>
+  </section>
+
+  <!-- ===== Ergebnisse ===== -->
+  <section id="view-ergebnisse" class="view" hidden>
+    <div class="rang-kopf">
+      <h2>Ergebnisse</h2>
+      <p id="erg-info" class="rang-info"></p>
+    </div>
+    <div id="ergebnis-liste" class="spiele-liste"></div>
+    <p id="erg-leer" class="leer" hidden>Noch keine Endstände vorhanden.</p>
+  </section>
+
+  <!-- ===== Profil ===== -->
+  <section id="view-profil" class="view" hidden>
+    <div class="rang-kopf"><h2>Profil und Runde</h2></div>
+
+    <form id="profil-form" class="feld-gruppe">
+      <label class="feld">
+        <span class="feld-label">Dein Name in der Rangliste</span>
+        <input id="in-name" type="text" maxlength="24" placeholder="z. B. Michi" autocomplete="nickname">
+      </label>
+      <label class="feld">
+        <span class="feld-label">Rundencode</span>
+        <input id="in-runde" type="text" maxlength="32" placeholder="z. B. eishalle-2627" autocomplete="off">
+        <span class="feld-hilfe">Alle mit demselben Code tippen in einer gemeinsamen Rangliste.</span>
+      </label>
+      <button type="submit" class="knopf knopf-voll">Speichern</button>
+    </form>
+
+    <details class="block">
+      <summary>Gemeinsame Rangliste einrichten</summary>
+      <p class="block-text">
+        Ohne Verbindung läuft alles nur auf diesem Gerät. Für die gemeinsame Rangliste
+        trägst du hier die Firebase-Konfiguration ein – einmal, auf jedem Gerät.
+        Die Anleitung steht in der README.
+      </p>
+      <label class="feld">
+        <span class="feld-label">Firebase-Konfiguration (JSON)</span>
+        <textarea id="in-firebase" rows="7" spellcheck="false" placeholder='{ "apiKey": "…", "authDomain": "…", "projectId": "…", "appId": "…" }'></textarea>
+      </label>
+      <div class="knopf-reihe">
+        <button id="btn-fb-speichern" type="button" class="knopf">Verbinden</button>
+        <button id="btn-fb-loeschen" type="button" class="knopf knopf-still">Trennen</button>
+      </div>
+      <p id="fb-status" class="block-text"></p>
+    </details>
+
+    <details class="block">
+      <summary>Endstände von Hand nachtragen</summary>
+      <p class="block-text">
+        Falls die nächtliche Aktualisierung ein Spiel nicht erwischt hat, kannst du den
+        Endstand hier selbst setzen. Gilt nur auf diesem Gerät, bis die Datei nachzieht.
+      </p>
+      <div id="admin-liste" class="admin-liste"></div>
+    </details>
+
+    <details class="block">
+      <summary>Daten sichern</summary>
+      <div class="knopf-reihe">
+        <button id="btn-export" type="button" class="knopf">Tipps exportieren</button>
+        <button id="btn-import" type="button" class="knopf">Tipps einlesen</button>
+      </div>
+      <input id="datei-import" type="file" accept="application/json" hidden>
+    </details>
+
+    <p id="daten-stand" class="daten-stand"></p>
+  </section>
+
+</main>
+
+<nav class="reiter" role="tablist">
+  <button class="reiter-knopf ist-aktiv" data-view="tippen" role="tab" aria-selected="true">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg>Tippen
+  </button>
+  <button class="reiter-knopf" data-view="tabelle" role="tab" aria-selected="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-6"/></svg>Rangliste
+  </button>
+  <button class="reiter-knopf" data-view="ergebnisse" role="tab" aria-selected="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>Ergebnisse
+  </button>
+  <button class="reiter-knopf" data-view="profil" role="tab" aria-selected="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="3.5"/><path d="M5.5 19c1.4-3 4-4.5 6.5-4.5s5.1 1.5 6.5 4.5"/></svg>Profil
+  </button>
+</nav>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
