@@ -1,0 +1,10 @@
+Hier kommen die Vereinslogos hinein.
+
+Dateiname frei wählbar, eingetragen wird der Pfad in data/spielplan.json
+beim jeweiligen Team im Feld "logo", zum Beispiel:
+
+  "logo": "icons/teams/deggendorf.svg"
+
+Empfehlung: quadratische SVG oder PNG, mindestens 128 x 128 px,
+transparenter Hintergrund. Solange "logo" auf null steht, zeigt die App
+eine Farbmarke mit dem Vereinskürzel.

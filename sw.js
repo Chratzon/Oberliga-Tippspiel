@@ -1,6 +1,6 @@
 /* Service Worker – App-Shell aus dem Cache, Daten bevorzugt aus dem Netz. */
 
-const CACHE = 'bully-v1';
+const CACHE = 'bully-v2';
 
 const SHELL = [
   './',
@@ -39,6 +39,20 @@ self.addEventListener('fetch', (e) => {
           return antwort;
         })
         .catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Vereinslogos: aus dem Cache, sonst holen und dort ablegen.
+  if (url.pathname.includes('/icons/teams/')) {
+    e.respondWith(
+      caches.match(e.request).then((treffer) => treffer || fetch(e.request).then((antwort) => {
+        if (antwort.ok) {
+          const kopie = antwort.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, kopie));
+        }
+        return antwort;
+      }))
     );
     return;
   }

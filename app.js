@@ -99,6 +99,28 @@ function team(id) {
   return zustand.teams.get(id) || { name: id, kurz: id.slice(0, 3).toUpperCase(), ort: '' };
 }
 
+/* Wappen: liegt für den Verein eine Logodatei vor, wird sie gezeigt.
+   Sonst eine Farbmarke mit dem Kürzel – funktioniert offline und
+   braucht keine fremden Bildrechte. */
+function wappen(t) {
+  if (t.logo) {
+    return `<img class="wappen" src="${t.logo}" alt="" loading="lazy"
+             onerror="this.replaceWith(Object.assign(document.createElement('span'),
+             {className:'wappen wappen-ersatz',textContent:'${t.kurz || ''}',
+              style:'background:${t.farbe || '#16232E'};color:${t.farbe2 || '#fff'}'}))">`;
+  }
+  const hell = istHell(t.farbe || '#16232E');
+  return `<span class="wappen wappen-ersatz" aria-hidden="true"
+           style="background:${t.farbe || '#16232E'};color:${hell ? '#16232E' : '#FFFFFF'};
+                  box-shadow:inset 0 0 0 2px ${t.farbe2 || 'transparent'}">${t.kurz || ''}</span>`;
+}
+
+function istHell(hex) {
+  const n = parseInt(hex.replace('#', ''), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 150;
+}
+
 function toast(text) {
   const el = $('#toast');
   el.textContent = text;
@@ -176,12 +198,12 @@ function spielKarte(spiel) {
       <span class="anpfiff">${erg ? '' : zeitText}</span>
     </div>
     <div class="paarung">
-      <div class="mannschaft heim">${h.name}<span class="kuerzel">Heim</span></div>
+      <div class="mannschaft heim">${wappen(h)}<span class="ms-name">${h.name}</span></div>
       <div class="endstand ${erg ? '' : 'ist-offen'}">
         ${erg ? `${erg.h}:${erg.a}` : '–:–'}
         ${erg && erg.art !== 'REG' ? `<span class="zusatz">${AUSGANG[erg.art]}</span>` : ''}
       </div>
-      <div class="mannschaft gast">${g.name}<span class="kuerzel">Gast</span></div>
+      <div class="mannschaft gast"><span class="ms-name">${g.name}</span>${wappen(g)}</div>
     </div>`;
 
   karte.appendChild(gesperrt ? gesperrtLeiste(tipp, punkte) : tippFeld(spiel, tipp));

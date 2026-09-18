@@ -98,7 +98,34 @@ bei 14 Vereinen spielt jeder an jedem Spieltag. Bei einer Spielverlegung kann
 diese Zuordnung um einen Block verrutschen; die Tipps hängen an der Spiel-ID,
 nicht am Spieltag, es geht dabei also nichts verloren.
 
-## 4. Wertung
+## 4. Vereinslogos
+
+Ausgeliefert wird die App mit Farbmarken: ein Kreis in den Vereinsfarben mit
+dem Kürzel. Die funktionieren offline, sind sofort unterscheidbar und berühren
+keine fremden Rechte.
+
+Echte Wappen einsetzen:
+
+1. Logo als quadratisches SVG oder PNG (mindestens 128 px, transparent) nach
+   `icons/teams/` legen.
+2. In `data/spielplan.json` beim Verein das Feld `logo` füllen:
+   `"logo": "icons/teams/deggendorf.svg"`.
+
+Der Scraper überschreibt nur `spiele`, die Team-Einträge mit Logos und Farben
+bleiben also erhalten.
+
+Woher die Dateien: die meisten Vereine haben einen Presse- oder
+Downloadbereich auf ihrer Seite, sonst kurz anfragen. Vereinswappen sind
+geschützte Marken – in einer privaten Tipprunde stört das niemanden, eine
+öffentlich erreichbare Seite mit allen vierzehn Logos ist rechtlich etwas
+anderes. Wenn die App öffentlich auf Pages liegt, ist das Kürzel die
+sorgenfreiere Variante.
+
+Die Farben in `spielplan.json` sind ein Startwert und teils von mir geschätzt.
+Pro Verein zwei Werte: `farbe` (Fläche) und `farbe2` (der Ring darum).
+Bei hellen Flächen schaltet die Schrift automatisch auf dunkel.
+
+## 5. Wertung
 
 | Punkte | Bedingung |
 |---|---|
@@ -114,7 +141,7 @@ Penalty ist der Abstand immer genau ein Tor – auch das prüft die App.
 
 Andere Werte stehen in `app.js` ganz oben in `WERTUNG` und `punkteFuer()`.
 
-## 5. Tipps sind gesperrt
+## 6. Tipps sind gesperrt
 
 Ein Spiel lässt sich bis zum Anpfiff tippen, danach ist das Feld zu. Gibt der
 Spielplan keine Uhrzeit her, sperrt die App ab Mitternacht des Spieltags.
