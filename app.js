@@ -1,6 +1,6 @@
 /* Bully – Tippspiel Oberliga Süd 26/27 */
 
-import { Sync } from './sync.js';
+import { Sync, GruppenFehler } from './sync.js';
 
 /* ========== Wertung ========== */
 
@@ -41,7 +41,8 @@ const zustand = {
   tipps: {},               // spielId -> {h,a,art}
   fremdeTipps: {},         // teilnehmerId -> {name, tipps:{...}}
   eigeneKorrekturen: {},   // spielId -> {h,a,art}  (manuell nachgetragen)
-  profil: { name: '', runde: 'standard', id: null },
+  gruppen: [],             // [{code, name, ersteller, offen}]
+  profil: { name: '', gruppe: null, id: null },
   firebase: null,
   spieltag: 1,
   ansicht: 'tippen',
@@ -55,18 +56,28 @@ function laden() {
     const d = JSON.parse(roh);
     Object.assign(zustand.profil, d.profil || {});
     zustand.tipps = d.tipps || {};
+    zustand.gruppen = d.gruppen || [];
     zustand.eigeneKorrekturen = d.eigeneKorrekturen || {};
     zustand.firebase = d.firebase || null;
   } catch (e) {
     console.warn('Gespeicherte Daten unlesbar, starte leer.', e);
   }
   if (!zustand.profil.id) zustand.profil.id = 'sp_' + Math.random().toString(36).slice(2, 11);
+
+  // Aus der Zeit vor den Gruppen: alter Rundencode wird zur Gruppe.
+  if (zustand.profil.runde && zustand.gruppen.length === 0) {
+    const code = String(zustand.profil.runde).toUpperCase();
+    zustand.gruppen.push({ code, name: zustand.profil.runde, ersteller: zustand.profil.id, offen: true });
+    zustand.profil.gruppe = code;
+  }
+  delete zustand.profil.runde;
 }
 
 function sichern() {
   localStorage.setItem(SCHLUESSEL, JSON.stringify({
     profil: zustand.profil,
     tipps: zustand.tipps,
+    gruppen: zustand.gruppen,
     eigeneKorrekturen: zustand.eigeneKorrekturen,
     firebase: zustand.firebase,
   }));
@@ -297,7 +308,13 @@ function tippFeld(spiel, tipp) {
 
 /* ========== Ansicht: Rangliste ========== */
 
+function aktiveGruppe() {
+  return zustand.gruppen.find((g) => g.code === zustand.profil.gruppe) || null;
+}
+
 function zeichneRangliste() {
+  const gruppe = aktiveGruppe();
+
   const teilnehmer = [
     { id: zustand.profil.id, name: zustand.profil.name || 'Du', tipps: zustand.tipps, ich: true },
     ...Object.entries(zustand.fremdeTipps)
@@ -320,9 +337,11 @@ function zeichneRangliste() {
     return { ...t, punkte, treffer, getippt };
   }).sort((a, b) => b.punkte - a.punkte || b.treffer - a.treffer || a.name.localeCompare(b.name));
 
-  $('#rang-info').textContent = gewertet
-    ? `${gewertet} gewertete ${gewertet === 1 ? 'Partie' : 'Partien'} · Runde „${zustand.profil.runde}“`
-    : `Runde „${zustand.profil.runde}“`;
+  const teile = [];
+  if (gruppe) teile.push(`${gruppe.name} · ${reihen.length} ${reihen.length === 1 ? 'Mitspieler' : 'Mitspieler'}`);
+  else teile.push('Keine Gruppe aktiv');
+  if (gewertet) teile.push(`${gewertet} gewertete ${gewertet === 1 ? 'Partie' : 'Partien'}`);
+  $('#rang-info').textContent = teile.join(' · ');
 
   const liste = $('#rangliste');
   liste.innerHTML = '';
@@ -367,11 +386,91 @@ function zeichneErgebnisse() {
 
 /* ========== Ansicht: Profil ========== */
 
+function zeichneGruppen() {
+  const liste = $('#gruppen-liste');
+  liste.innerHTML = '';
+  $('#gruppen-leer').hidden = zustand.gruppen.length > 0;
+
+  for (const g of zustand.gruppen) {
+    const aktiv = g.code === zustand.profil.gruppe;
+    const meine = g.ersteller === zustand.profil.id;
+    const anzahl = aktiv ? Object.keys(zustand.fremdeTipps).length : null;
+
+    const li = document.createElement('li');
+    li.className = 'gruppe' + (aktiv ? ' ist-aktiv' : '');
+    li.innerHTML = `
+      <div class="gruppe-kopf">
+        <span class="gruppe-name">${g.name}</span>
+        ${aktiv ? '<span class="gruppe-marke">aktiv</span>' : ''}
+      </div>
+      <div class="gruppe-meta">
+        <span class="gruppe-code">${g.code}</span>
+        ${anzahl !== null ? `<span>${anzahl || 1} ${anzahl === 1 ? 'Mitspieler' : 'Mitspieler'}</span>` : ''}
+        ${meine ? '<span>von dir gegründet</span>' : ''}
+        ${g.offen === false ? '<span>geschlossen</span>' : ''}
+      </div>
+      <div class="gruppe-aktionen">
+        ${aktiv ? '' : '<button type="button" data-tat="wechseln">Aktivieren</button>'}
+        <button type="button" data-tat="einladen">Einladen</button>
+        ${meine ? `<button type="button" data-tat="sperren">${g.offen === false ? 'Wieder öffnen' : 'Schließen'}</button>` : ''}
+        <button type="button" data-tat="verlassen" class="tat-warnung">Verlassen</button>
+      </div>`;
+
+    li.addEventListener('click', async (e) => {
+      const tat = e.target.closest('[data-tat]')?.dataset.tat;
+      if (!tat) return;
+
+      if (tat === 'wechseln') {
+        Sync.gruppeWechseln(g.code);
+        sichern();
+        kopfAktualisieren();
+        zeichneGruppen();
+        toast(`„${g.name}“ ist aktiv`);
+      }
+
+      if (tat === 'einladen') await einladen(g);
+
+      if (tat === 'sperren') {
+        try {
+          await Sync.gruppeSperren(g.code, g.offen === false);
+          zeichneGruppen();
+          toast(g.offen === false ? 'Gruppe ist wieder offen' : 'Gruppe nimmt niemanden mehr auf');
+        } catch (err) { toast(err.message); }
+      }
+
+      if (tat === 'verlassen') {
+        if (!confirm(`„${g.name}“ wirklich verlassen? Deine Tipps bleiben erhalten, du tauchst dort aber nicht mehr auf.`)) return;
+        await Sync.gruppeVerlassen(g.code);
+        sichern();
+        kopfAktualisieren();
+        zeichneGruppen();
+        toast('Gruppe verlassen');
+      }
+    });
+
+    liste.appendChild(li);
+  }
+}
+
+async function einladen(g) {
+  const link = Sync.einladungsLink(g.code);
+  const text = `Tipp mit bei „${g.name}“ – Code ${g.code}\n${link}`;
+  if (navigator.share) {
+    try { await navigator.share({ title: g.name, text }); return; } catch { /* abgebrochen */ }
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('Einladung kopiert');
+  } catch {
+    prompt('Einladung kopieren:', text);
+  }
+}
+
 function zeichneProfil() {
   $('#in-name').value = zustand.profil.name;
-  $('#in-runde').value = zustand.profil.runde;
   $('#in-firebase').value = zustand.firebase ? JSON.stringify(zustand.firebase, null, 2) : '';
   $('#fb-status').textContent = Sync.statusText();
+  zeichneGruppen();
   $('#daten-stand').textContent = zustand.standDaten
     ? `Spielplan und Ergebnisse vom ${new Date(zustand.standDaten).toLocaleDateString('de-DE')}`
     : 'Spielplan aus der mitgelieferten Datei';
@@ -433,8 +532,8 @@ function zeige(name) {
 }
 
 function kopfAktualisieren() {
-  const name = zustand.profil.name.trim();
-  $('#spieler-initial').textContent = name ? name[0].toUpperCase() : '?';
+  const g = aktiveGruppe();
+  $('#chip-gruppe').textContent = g ? g.name : 'Keine Gruppe';
 }
 
 function syncBand(text, fehler = false) {
@@ -442,6 +541,28 @@ function syncBand(text, fehler = false) {
   el.hidden = !text;
   el.textContent = text || '';
   el.classList.toggle('ist-fehler', fehler);
+}
+
+/* Wird die App über einen Einladungslink geöffnet, direkt beitreten. */
+async function einladungPruefen() {
+  const code = new URLSearchParams(location.search).get('gruppe');
+  if (!code) return;
+  history.replaceState(null, '', location.pathname);
+
+  try {
+    const daten = await Sync.gruppeBeitreten(code);
+    sichern();
+    kopfAktualisieren();
+    toast(`Du bist jetzt bei „${daten.name}“ dabei`);
+  } catch (err) {
+    toast(err.message);
+    // Ohne Verbindung den Code merken, damit er nach dem Einrichten noch da ist.
+    if (!Sync.verbunden()) {
+      sessionStorage.setItem('bully.einladung', code.toUpperCase());
+      return code.toUpperCase();
+    }
+  }
+  return null;
 }
 
 /* ========== Start ========== */
@@ -468,15 +589,59 @@ async function start() {
   $('#st-zurueck').addEventListener('click', () => { zustand.spieltag--; zeichneTippen(); });
   $('#st-vor').addEventListener('click', () => { zustand.spieltag++; zeichneTippen(); });
 
-  // Profil speichern
+  // Name speichern
   $('#profil-form').addEventListener('submit', (e) => {
     e.preventDefault();
     zustand.profil.name = $('#in-name').value.trim();
-    zustand.profil.runde = ($('#in-runde').value.trim() || 'standard').toLowerCase();
     sichern();
-    kopfAktualisieren();
-    toast('Profil gespeichert');
-    Sync.neuVerbinden();
+    toast('Name gespeichert');
+    Sync.mitgliedschaftenSchreiben().catch(() => {});
+  });
+
+  // Gruppen
+  const umschalten = (welches) => {
+    $('#form-gruppe-neu').hidden = welches !== 'neu';
+    $('#form-gruppe-beitreten').hidden = welches !== 'beitreten';
+    if (welches === 'neu') $('#in-gruppe-name').focus();
+    if (welches === 'beitreten') $('#in-gruppe-code').focus();
+  };
+
+  $('#btn-gruppe-neu').addEventListener('click', () =>
+    umschalten($('#form-gruppe-neu').hidden ? 'neu' : null));
+  $('#btn-gruppe-beitreten').addEventListener('click', () =>
+    umschalten($('#form-gruppe-beitreten').hidden ? 'beitreten' : null));
+
+  $('#form-gruppe-neu').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = $('#in-gruppe-name').value;
+    try {
+      const g = await Sync.gruppeAnlegen(name);
+      sichern();
+      kopfAktualisieren();
+      zeichneGruppen();
+      umschalten(null);
+      $('#in-gruppe-name').value = '';
+      toast(`„${g.name}“ angelegt, Code ${g.code}`);
+      if (!Sync.verbunden()) {
+        toast('Ohne Verbindung bleibt die Gruppe auf diesem Gerät');
+      }
+    } catch (err) { toast(err.message); }
+  });
+
+  $('#form-gruppe-beitreten').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const daten = await Sync.gruppeBeitreten($('#in-gruppe-code').value);
+      sichern();
+      kopfAktualisieren();
+      zeichneGruppen();
+      umschalten(null);
+      $('#in-gruppe-code').value = '';
+      toast(`Willkommen bei „${daten.name}“`);
+    } catch (err) {
+      toast(err.message);
+      if (err instanceof GruppenFehler) { sichern(); kopfAktualisieren(); zeichneGruppen(); }
+    }
   });
 
   // Firebase
@@ -491,7 +656,21 @@ async function start() {
     await Sync.neuVerbinden();
     sichern();
     $('#fb-status').textContent = Sync.statusText();
-    toast(Sync.verbunden() ? 'Verbunden' : 'Verbindung fehlgeschlagen');
+
+    const gemerkt = sessionStorage.getItem('bully.einladung');
+    if (Sync.verbunden() && gemerkt) {
+      sessionStorage.removeItem('bully.einladung');
+      try {
+        const daten = await Sync.gruppeBeitreten(gemerkt);
+        sichern();
+        toast(`Verbunden und bei „${daten.name}“ dabei`);
+      } catch (err) { toast(err.message); }
+    } else {
+      toast(Sync.verbunden() ? 'Verbunden' : 'Verbindung fehlgeschlagen');
+    }
+
+    kopfAktualisieren();
+    zeichneGruppen();
   });
 
   $('#btn-fb-loeschen').addEventListener('click', () => {
@@ -533,13 +712,25 @@ async function start() {
   // Sync starten
   Sync.init({
     zustand,
-    beiAenderung: () => { if (zustand.ansicht === 'tabelle') zeichneRangliste(); },
+    beiAenderung: () => {
+      kopfAktualisieren();
+      if (zustand.ansicht === 'tabelle') zeichneRangliste();
+      if (zustand.ansicht === 'profil') zeichneGruppen();
+    },
     beiStatus: syncBand,
   });
   await Sync.neuVerbinden();
   sichern();   // die von Firebase vergebene Teilnehmer-ID festhalten
 
-  zeige('tippen');
+  const offeneEinladung = await einladungPruefen();
+
+  if (offeneEinladung) {
+    zeige('profil');
+    $('#in-gruppe-code').value = offeneEinladung;
+    $('#form-gruppe-beitreten').hidden = false;
+  } else {
+    zeige('tippen');
+  }
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});

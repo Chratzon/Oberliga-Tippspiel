@@ -21,8 +21,9 @@
       <span class="tafel-liga-name">Oberliga Süd</span>
       <span class="tafel-saison">Saison 26/27</span>
     </div>
-    <button id="btn-profil" class="spieler-chip" type="button" aria-label="Profil öffnen">
-      <span id="spieler-initial">?</span>
+    <button id="btn-profil" class="gruppe-chip" type="button" aria-label="Gruppen und Profil öffnen">
+      <span id="chip-gruppe">Keine Gruppe</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>
     </button>
   </div>
   <div id="sync-band" class="sync-band" hidden></div>
@@ -72,26 +73,52 @@
 
   <!-- ===== Profil ===== -->
   <section id="view-profil" class="view" hidden>
-    <div class="rang-kopf"><h2>Profil und Runde</h2></div>
+    <div class="rang-kopf"><h2>Gruppen und Profil</h2></div>
+
+    <div class="block block-offen">
+      <h3>Meine Gruppen</h3>
+      <ul id="gruppen-liste" class="gruppen-liste"></ul>
+      <p id="gruppen-leer" class="block-text" hidden>
+        Noch keine Gruppe. Gründe eine und schick den Code an deine Mitspieler,
+        oder tritt mit einem Code bei, den du bekommen hast.
+      </p>
+
+      <div class="knopf-reihe">
+        <button id="btn-gruppe-neu" type="button" class="knopf">Gruppe gründen</button>
+        <button id="btn-gruppe-beitreten" type="button" class="knopf knopf-still">Mit Code beitreten</button>
+      </div>
+
+      <form id="form-gruppe-neu" class="unterformular" hidden>
+        <label class="feld">
+          <span class="feld-label">Name der Gruppe</span>
+          <input id="in-gruppe-name" type="text" maxlength="30" placeholder="z. B. Eishalle Rosenheim">
+        </label>
+        <button type="submit" class="knopf knopf-voll">Gruppe anlegen</button>
+      </form>
+
+      <form id="form-gruppe-beitreten" class="unterformular" hidden>
+        <label class="feld">
+          <span class="feld-label">Beitrittscode</span>
+          <input id="in-gruppe-code" type="text" maxlength="12" autocapitalize="characters"
+                 autocomplete="off" spellcheck="false" placeholder="z. B. K7QM2P">
+        </label>
+        <button type="submit" class="knopf knopf-voll">Beitreten</button>
+      </form>
+    </div>
 
     <form id="profil-form" class="feld-gruppe">
       <label class="feld">
         <span class="feld-label">Dein Name in der Rangliste</span>
         <input id="in-name" type="text" maxlength="24" placeholder="z. B. Michi" autocomplete="nickname">
       </label>
-      <label class="feld">
-        <span class="feld-label">Rundencode</span>
-        <input id="in-runde" type="text" maxlength="32" placeholder="z. B. eishalle-2627" autocomplete="off">
-        <span class="feld-hilfe">Alle mit demselben Code tippen in einer gemeinsamen Rangliste.</span>
-      </label>
-      <button type="submit" class="knopf knopf-voll">Speichern</button>
+      <button type="submit" class="knopf knopf-voll">Namen speichern</button>
     </form>
 
     <details class="block">
-      <summary>Gemeinsame Rangliste einrichten</summary>
+      <summary>Verbindung einrichten</summary>
       <p class="block-text">
-        Ohne Verbindung läuft alles nur auf diesem Gerät. Für die gemeinsame Rangliste
-        trägst du hier die Firebase-Konfiguration ein – einmal, auf jedem Gerät.
+        Gruppen über mehrere Geräte brauchen eine Verbindung. Trage die
+        Firebase-Konfiguration einmal ein – jeder Mitspieler dieselbe.
         Die Anleitung steht in der README.
       </p>
       <label class="feld">

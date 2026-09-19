@@ -77,11 +77,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .tafel-saison { font-size: 0.72rem; color: #8FA9BA; font-weight: 500; }
 
-.spieler-chip {
-  width: 34px; height: 34px; border-radius: 50%;
-  border: 1.5px solid #4A6274; background: transparent;
-  color: #EAF2F7; font-weight: 700; font-size: 0.85rem;
-  display: grid; place-items: center;
+.gruppe-chip {
+  display: flex; align-items: center; gap: 4px;
+  max-width: 48vw; padding: 6px 8px 6px 12px;
+  border-radius: 999px; border: 1.5px solid #4A6274; background: transparent;
+  color: #EAF2F7; font-weight: 600; font-size: 0.8rem;
+}
+.gruppe-chip span {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.gruppe-chip svg {
+  width: 15px; height: 15px; flex: 0 0 auto;
+  fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
 }
 
 .sync-band {
@@ -354,4 +362,49 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
+}
+
+/* ---------- Gruppen ---------- */
+
+
+.gruppen-liste { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+
+.gruppe {
+  border: 1px solid var(--grau-hell); border-radius: 8px;
+  padding: 10px 12px;
+}
+.gruppe.ist-aktiv { border-color: var(--blaulinie); border-left-width: 4px; }
+
+.gruppe-kopf { display: flex; align-items: center; gap: 8px; }
+.gruppe-name { font-weight: 700; font-size: 0.95rem; }
+.gruppe-marke {
+  font-size: 0.66rem; font-weight: 700; color: #FFFFFF;
+  background: var(--blaulinie); border-radius: 999px; padding: 1px 7px;
+}
+
+.gruppe-meta {
+  display: flex; flex-wrap: wrap; gap: 4px 10px;
+  font-size: 0.74rem; color: var(--grau); margin-top: 2px;
+}
+.gruppe-code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-weight: 600; letter-spacing: 0.12em; color: var(--puck);
+}
+
+.gruppe-aktionen { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.gruppe-aktionen button {
+  padding: 5px 11px; border-radius: 999px;
+  border: 1px solid var(--grau-hell); background: transparent;
+  font-size: 0.78rem; font-weight: 600;
+}
+.gruppe-aktionen .tat-warnung { color: var(--mittellinie); border-color: var(--mittellinie); }
+
+.unterformular {
+  display: flex; flex-direction: column; gap: 10px;
+  margin-top: 12px; padding-top: 12px;
+  border-top: 1px solid var(--grau-hell);
+}
+#in-gruppe-code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.18em; text-transform: uppercase; font-size: 1.05rem;
 }
