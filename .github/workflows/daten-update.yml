@@ -1,7 +1,6 @@
-yaml
 name: Spielplan und Ergebnisse aktualisieren
 
-on:
+"on":
   schedule:
     - cron: '*/10 13-22 * * *'
     - cron: '15 5 * * *'
