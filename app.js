@@ -665,6 +665,50 @@ function einladungVorbelegen() {
   return true;
 }
 
+/* ========== Passwortfelder ========== */
+
+/* Hängt an jedes Passwortfeld einen Knopf zum Sichtbarmachen.
+   Wird einmal beim Start über alle vorhandenen Felder gelegt. */
+function passwortFelderAufwerten() {
+  for (const feld of document.querySelectorAll('input[type="password"]')) {
+    if (feld.closest('.pw-feld')) continue;
+
+    const huelle = document.createElement('div');
+    huelle.className = 'pw-feld';
+    feld.parentNode.insertBefore(huelle, feld);
+    huelle.appendChild(feld);
+
+    const knopf = document.createElement('button');
+    knopf.type = 'button';
+    knopf.className = 'pw-knopf';
+    knopf.setAttribute('aria-label', 'Passwort anzeigen');
+    knopf.setAttribute('aria-pressed', 'false');
+    knopf.innerHTML = AUGE_ZU;
+
+    knopf.addEventListener('click', () => {
+      const sichtbar = feld.type === 'text';
+      feld.type = sichtbar ? 'password' : 'text';
+      knopf.innerHTML = sichtbar ? AUGE_ZU : AUGE_AUF;
+      knopf.setAttribute('aria-label', sichtbar ? 'Passwort anzeigen' : 'Passwort verbergen');
+      knopf.setAttribute('aria-pressed', String(!sichtbar));
+      // Der Tippfluss soll nicht abreißen.
+      feld.focus();
+      const ende = feld.value.length;
+      try { feld.setSelectionRange(ende, ende); } catch { /* Typwechsel */ }
+    });
+
+    huelle.appendChild(knopf);
+  }
+}
+
+const AUGE_ZU = `<svg viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/>
+  <circle cx="12" cy="12" r="3"/></svg>`;
+
+const AUGE_AUF = `<svg viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/>
+  <circle cx="12" cy="12" r="3"/><path d="M4 20L20 4"/></svg>`;
+
 /* ========== Start ========== */
 
 async function start() {
@@ -698,6 +742,7 @@ async function start() {
 
   begruessungAnbinden();
   raumFormulareAnbinden();
+  passwortFelderAufwerten();
 
   $('#btn-export').addEventListener('click', () => {
     const blob = new Blob([JSON.stringify({ profil: zustand.profil, tipps: zustand.tipps }, null, 2)],

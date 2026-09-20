@@ -468,3 +468,25 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.
 
 .konto-name { font-size: 0.9rem; margin: 0 0 6px; }
 .konto-name b { font-weight: 700; }
+
+/* ---------- Passwortfeld ---------- */
+
+.pw-feld { position: relative; display: flex; }
+.pw-feld input { padding-right: 46px; }
+
+.pw-knopf {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  width: 38px; height: 38px; padding: 0;
+  display: grid; place-items: center;
+  border: none; background: none; color: var(--grau);
+  border-radius: 6px;
+}
+.pw-knopf:hover { color: var(--puck); }
+.pw-knopf svg {
+  width: 20px; height: 20px; fill: none;
+  stroke: currentColor; stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.willkommen .pw-knopf { color: #6A8296; }
+.willkommen .pw-knopf:hover { color: #EAF2F7; }
