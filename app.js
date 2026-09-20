@@ -579,6 +579,13 @@ function syncBand(text, fehler = false) {
 /* ========== Begrüßung ========== */
 
 function begruessungZeigen(an) {
+  if (an && !Sync.verbunden()) {
+    const w = $('#willkommen-warnung');
+    w.hidden = false;
+    w.textContent = 'Keine Verbindung zum Server. Die Anmeldung mit Google '
+      + 'funktioniert gerade nicht – mit einem Namen kommst du trotzdem rein und '
+      + 'tippst erst einmal für dich.';
+  }
   $('#willkommen').hidden = !an;
   $('#inhalt').hidden = an;
   document.querySelector('.reiter').hidden = an;
@@ -599,6 +606,11 @@ function begruessungAnbinden() {
   });
 
   $('#btn-start-google').addEventListener('click', async () => {
+    if (!Sync.verbunden()) {
+      toast('Ohne Verbindung geht das nicht – gib einfach einen Namen ein');
+      $('#in-startname').focus();
+      return;
+    }
     try {
       const ergebnis = await Sync.googleWaehlen();
       if (ergebnis === null) return;
@@ -785,6 +797,10 @@ async function start() {
 
   const wartendeEinladung = einladungVorbelegen();
 
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+
   if (!zustand.profil.name) {
     begruessungZeigen(true);
     $('#in-startname').focus();
@@ -793,10 +809,6 @@ async function start() {
 
   begruessungZeigen(false);
   zeige(wartendeEinladung || !zustand.raeume.length ? 'profil' : 'tippen');
-
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  }
 }
 
 start();

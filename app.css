@@ -490,3 +490,10 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.
 
 .willkommen .pw-knopf { color: #6A8296; }
 .willkommen .pw-knopf:hover { color: #EAF2F7; }
+
+.willkommen-warnung {
+  font-size: 0.8rem; line-height: 1.5; color: #F2C4C9;
+  border-left: 3px solid var(--mittellinie);
+  padding: 9px 12px; margin: 16px 0 0;
+  background: rgba(200, 16, 46, 0.12);
+}

@@ -1,6 +1,6 @@
 /* Service Worker – App-Shell aus dem Cache, Daten bevorzugt aus dem Netz. */
 
-const CACHE = 'bully-v7';
+const CACHE = 'bully-v8';
 
 const SHELL = [
   './',
@@ -8,7 +8,6 @@ const SHELL = [
   './app.css',
   './app.js',
   './sync.js',
-  './konfig.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -30,8 +29,8 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
 
-  // Spielplan und Ergebnisse: erst Netz, Cache als Rückfallebene.
-  if (url.pathname.includes('/data/')) {
+  // Zugangsdaten und Spieldaten: erst Netz, Cache nur als Rückfallebene.
+  if (url.pathname.includes('/data/') || url.pathname.endsWith('/konfig.js')) {
     e.respondWith(
       fetch(e.request)
         .then((antwort) => {
