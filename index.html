@@ -158,6 +158,12 @@
       </form>
     </div>
 
+    <div class="block" id="block-install" hidden>
+      <h3>App installieren</h3>
+      <p class="block-text" id="install-text"></p>
+      <div class="knopf-reihe" id="install-knoepfe"></div>
+    </div>
+
     <details class="block">
       <summary>Endstände von Hand nachtragen</summary>
       <p class="block-text">
@@ -195,6 +201,12 @@
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="3.5"/><path d="M5.5 19c1.4-3 4-4.5 6.5-4.5s5.1 1.5 6.5 4.5"/></svg>Profil
   </button>
 </nav>
+
+<div id="banner" class="banner" hidden>
+  <span id="banner-text"></span>
+  <button id="banner-aktion" type="button" class="banner-knopf"></button>
+  <button id="banner-zu" type="button" class="banner-zu" aria-label="Hinweis schließen">&times;</button>
+</div>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 

@@ -501,6 +501,7 @@ function zeichneProfil() {
   $('#in-name').value = zustand.profil.name;
   zeichneKonto();
   zeichneRaeume();
+  zeichneInstall();
 
   $('#hinweis-einrichtung').hidden = Boolean(FIREBASE_KONFIG && FIREBASE_KONFIG.projectId);
 
@@ -721,6 +722,134 @@ const AUGE_AUF = `<svg viewBox="0 0 24 24" aria-hidden="true">
   <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/>
   <circle cx="12" cy="12" r="3"/><path d="M4 20L20 4"/></svg>`;
 
+/* ========== Banner, Aktualisierung, Installation ========== */
+
+let installAngebot = null;      // beforeinstallprompt, aufgehoben
+let ladeNeu = false;
+
+function istInstalliert() {
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+
+function istApple() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function bannerZeigen(text, knopfText, aktion) {
+  $('#banner-text').textContent = text;
+  const knopf = $('#banner-aktion');
+  knopf.textContent = knopfText;
+  knopf.onclick = aktion;
+  $('#banner').hidden = false;
+}
+
+function bannerVerbergen() {
+  $('#banner').hidden = true;
+}
+
+/* Wartet eine neue Fassung im Hintergrund, fragt die App nach. */
+function neueVersionAnbieten(arbeiter) {
+  bannerZeigen('Neue Version verfügbar', 'Aktualisieren', () => {
+    bannerVerbergen();
+    arbeiter.postMessage('UEBERNEHMEN');
+  });
+}
+
+async function aktualisierungUeberwachen() {
+  if (!('serviceWorker' in navigator)) return;
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (ladeNeu) return;
+    ladeNeu = true;
+    location.reload();
+  });
+
+  let anmeldung;
+  try {
+    anmeldung = await navigator.serviceWorker.register('sw.js');
+  } catch { return; }
+
+  if (anmeldung.waiting && navigator.serviceWorker.controller) {
+    neueVersionAnbieten(anmeldung.waiting);
+  }
+
+  anmeldung.addEventListener('updatefound', () => {
+    const neu = anmeldung.installing;
+    if (!neu) return;
+    neu.addEventListener('statechange', () => {
+      if (neu.state === 'installed' && navigator.serviceWorker.controller) {
+        neueVersionAnbieten(neu);
+      }
+    });
+  });
+
+  // Beim Start und danach halbstündlich nachsehen
+  anmeldung.update().catch(() => {});
+  setInterval(() => anmeldung.update().catch(() => {}), 30 * 60 * 1000);
+}
+
+function installationAnbinden() {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    installAngebot = e;
+    if (!sessionStorage.getItem('bully.installWeg') && !istInstalliert()) {
+      bannerZeigen('Als App installieren?', 'Installieren', installAusloesen);
+    }
+    if (zustand.ansicht === 'profil') zeichneInstall();
+  });
+
+  window.addEventListener('appinstalled', () => {
+    installAngebot = null;
+    bannerVerbergen();
+    toast('Installiert – viel Erfolg beim Tippen');
+    zeichneInstall();
+  });
+
+  $('#banner-zu').addEventListener('click', () => {
+    sessionStorage.setItem('bully.installWeg', '1');
+    bannerVerbergen();
+  });
+}
+
+async function installAusloesen() {
+  if (!installAngebot) return;
+  bannerVerbergen();
+  installAngebot.prompt();
+  const { outcome } = await installAngebot.userChoice;
+  if (outcome !== 'accepted') sessionStorage.setItem('bully.installWeg', '1');
+  installAngebot = null;
+  zeichneInstall();
+}
+
+function zeichneInstall() {
+  const block = $('#block-install');
+  if (istInstalliert()) { block.hidden = true; return; }
+  block.hidden = false;
+
+  const knoepfe = $('#install-knoepfe');
+  knoepfe.innerHTML = '';
+
+  if (installAngebot) {
+    $('#install-text').textContent = 'Auf dem Startbildschirm startet die App schneller, '
+      + 'läuft ohne Browserleiste und funktioniert in der Halle auch ohne Empfang.';
+    const knopf = document.createElement('button');
+    knopf.type = 'button';
+    knopf.className = 'knopf';
+    knopf.textContent = 'Jetzt installieren';
+    knopf.onclick = installAusloesen;
+    knoepfe.appendChild(knopf);
+  } else if (istApple()) {
+    $('#install-text').textContent = 'In Safari unten auf das Teilen-Symbol tippen, '
+      + 'dann „Zum Home-Bildschirm“. Danach startet die App ohne Browserleiste '
+      + 'und funktioniert auch ohne Empfang.';
+  } else {
+    $('#install-text').textContent = 'Im Browsermenü „App installieren“ oder '
+      + '„Zum Startbildschirm hinzufügen“ wählen. Danach startet die App ohne '
+      + 'Browserleiste und funktioniert auch ohne Empfang.';
+  }
+}
+
 /* ========== Start ========== */
 
 async function start() {
@@ -755,6 +884,7 @@ async function start() {
   begruessungAnbinden();
   raumFormulareAnbinden();
   passwortFelderAufwerten();
+  installationAnbinden();
 
   $('#btn-export').addEventListener('click', () => {
     const blob = new Blob([JSON.stringify({ profil: zustand.profil, tipps: zustand.tipps }, null, 2)],
@@ -797,9 +927,7 @@ async function start() {
 
   const wartendeEinladung = einladungVorbelegen();
 
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  }
+  aktualisierungUeberwachen();
 
   if (!zustand.profil.name) {
     begruessungZeigen(true);

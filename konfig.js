@@ -1,16 +1,15 @@
 /* Feste Verbindungsdaten für diese Installation.
  *
- * Trägst du hier deine Firebase-Konfiguration ein, verbindet sich die App
- * beim Start von selbst. Deine Mitspieler müssen dann gar nichts einrichten:
- * Einladungslink antippen, Namen eingeben, tippen.
+ * Die App verbindet sich damit beim Start von selbst. Die Mitspieler richten
+ * nichts ein: Link öffnen, Namen eingeben oder mit Google anmelden, tippen.
  *
- * Die Werte sind keine Geheimnisse – sie stehen in jeder Firebase-Web-App
- * im Quelltext. Der Schutz kommt aus den Firestore-Regeln (siehe README).
- *
- * Bleibt der Wert null, fragt die App wie bisher im Profil danach.
+ * Diese Werte sind keine Geheimnisse – sie stehen in jeder Firebase-Web-App
+ * im Quelltext und werden bei jedem Seitenaufruf an den Browser geliefert.
+ * Sie identifizieren nur das Projekt. Wer was darf, entscheiden allein die
+ * Firestore-Regeln (siehe README, Abschnitt 4).
  */
 
-export const FIREBASE_KONFIG ={
+export const FIREBASE_KONFIG = {
   apiKey: "AIzaSyDa-dNmekolZJIbuBGzoutASa50Gli8vy0",
   authDomain: "tippspiel-oberliga.firebaseapp.com",
   projectId: "tippspiel-oberliga",
@@ -18,18 +17,3 @@ export const FIREBASE_KONFIG ={
   messagingSenderId: "533994067",
   appId: "1:533994067:web:b663efb28c8a97f38244a6"
 };
-
-/* So sieht es ausgefüllt aus – Block ersetzen und die Zeile oben löschen:
-
-export const FIREBASE_KONFIG = {
-  apiKey: "AIzaSy…",
-  authDomain: "bully-tippspiel.firebaseapp.com",
-  projectId: "bully-tippspiel",
-  storageBucket: "bully-tippspiel.firebasestorage.app",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:abc123def456"
-};
-
-Hier darf es JavaScript-Schreibweise sein, also ohne Anführungszeichen um
-die Namen – genau so, wie Firebase den Block anzeigt.
-*/

@@ -1,6 +1,6 @@
 /* Service Worker – App-Shell aus dem Cache, Daten bevorzugt aus dem Netz. */
 
-const CACHE = 'bully-v8';
+const CACHE = 'bully-v10';
 
 const SHELL = [
   './',
@@ -14,7 +14,12 @@ const SHELL = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));
+});
+
+/* Die App meldet sich, sobald der Nutzer auf „Aktualisieren" tippt. */
+self.addEventListener('message', (e) => {
+  if (e.data === 'UEBERNEHMEN') self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
