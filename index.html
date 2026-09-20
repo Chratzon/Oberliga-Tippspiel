@@ -29,6 +29,28 @@
   <div id="sync-band" class="sync-band" hidden></div>
 </header>
 
+<section id="willkommen" class="willkommen" hidden>
+  <div class="willkommen-innen">
+    <div class="willkommen-marke">Bully</div>
+    <h1>Tippspiel Oberliga Süd</h1>
+    <p class="willkommen-text">Sag uns, wie du in der Rangliste heißen sollst.</p>
+
+    <form id="form-start">
+      <input id="in-startname" type="text" maxlength="24" placeholder="Dein Name" autocomplete="nickname">
+      <button type="submit" class="knopf knopf-voll">Loslegen</button>
+    </form>
+
+    <div class="trenner"><span>oder</span></div>
+
+    <button id="btn-start-google" type="button" class="knopf knopf-google knopf-voll">Mit Google anmelden</button>
+
+    <p class="willkommen-fuss">
+      Anonym reicht völlig. Mit Google bleiben deine Tipps und Räume beim
+      Handywechsel erhalten.
+    </p>
+  </div>
+</section>
+
 <main id="inhalt">
 
   <!-- ===== Tippen ===== -->
@@ -73,72 +95,66 @@
 
   <!-- ===== Profil ===== -->
   <section id="view-profil" class="view" hidden>
-    <div class="rang-kopf"><h2>Gruppen und Profil</h2></div>
+    <div class="rang-kopf"><h2>Profil und Räume</h2></div>
 
-    <div class="block block-offen">
-      <h3>Meine Gruppen</h3>
-      <ul id="gruppen-liste" class="gruppen-liste"></ul>
-      <p id="gruppen-leer" class="block-text" hidden>
-        Noch keine Gruppe. Gründe eine und schick den Code an deine Mitspieler,
-        oder tritt mit einem Code bei, den du bekommen hast.
-      </p>
-
-      <div class="knopf-reihe">
-        <button id="btn-gruppe-neu" type="button" class="knopf">Gruppe gründen</button>
-        <button id="btn-gruppe-beitreten" type="button" class="knopf knopf-still">Mit Code beitreten</button>
-      </div>
-
-      <form id="form-gruppe-neu" class="unterformular" hidden>
-        <label class="feld">
-          <span class="feld-label">Name der Gruppe</span>
-          <input id="in-gruppe-name" type="text" maxlength="30" placeholder="z. B. Eishalle Rosenheim">
-        </label>
-        <button type="submit" class="knopf knopf-voll">Gruppe anlegen</button>
-      </form>
-
-      <form id="form-gruppe-beitreten" class="unterformular" hidden>
-        <label class="feld">
-          <span class="feld-label">Beitrittscode</span>
-          <input id="in-gruppe-code" type="text" maxlength="12" autocapitalize="characters"
-                 autocomplete="off" spellcheck="false" placeholder="z. B. K7QM2P">
-        </label>
-        <button type="submit" class="knopf knopf-voll">Beitreten</button>
-      </form>
-    </div>
+    <p id="hinweis-einrichtung" class="verbindungs-hinweis" hidden>
+      Diese Installation ist noch nicht mit Firebase verbunden. Bis die
+      Zugangsdaten in <code>konfig.js</code> stehen, bleiben Tipps auf diesem Gerät.
+    </p>
 
     <div class="block" id="block-konto">
       <h3>Konto</h3>
+      <p class="konto-name">Angemeldet als <b id="konto-name">–</b></p>
       <p id="konto-status" class="block-text"></p>
       <div class="knopf-reihe" id="konto-knoepfe"></div>
     </div>
 
     <form id="profil-form" class="feld-gruppe">
       <label class="feld">
-        <span class="feld-label">Dein Name in der Rangliste</span>
+        <span class="feld-label">Anzeigename ändern</span>
         <input id="in-name" type="text" maxlength="24" placeholder="z. B. Michi" autocomplete="nickname">
       </label>
-      <button type="submit" class="knopf knopf-voll">Namen speichern</button>
+      <button type="submit" class="knopf knopf-voll">Speichern</button>
     </form>
 
-    <p id="feste-verbindung" class="verbindungs-hinweis" hidden></p>
-
-    <details class="block" id="block-verbindung">
-      <summary>Verbindung einrichten</summary>
-      <p class="block-text">
-        Gruppen über mehrere Geräte brauchen eine Verbindung. Trage die
-        Firebase-Konfiguration einmal ein – jeder Mitspieler dieselbe.
-        Die Anleitung steht in der README.
+    <div class="block">
+      <h3>Meine Räume</h3>
+      <ul id="raum-liste" class="gruppen-liste"></ul>
+      <p id="raum-leer" class="block-text" hidden>
+        Noch in keinem Raum. Eröffne einen und gib Name und Passwort an deine
+        Mitspieler weiter, oder tritt einem bestehenden bei.
       </p>
-      <label class="feld">
-        <span class="feld-label">Firebase-Konfiguration (JSON)</span>
-        <textarea id="in-firebase" rows="7" spellcheck="false" placeholder='{ "apiKey": "…", "authDomain": "…", "projectId": "…", "appId": "…" }'></textarea>
-      </label>
+
       <div class="knopf-reihe">
-        <button id="btn-fb-speichern" type="button" class="knopf">Verbinden</button>
-        <button id="btn-fb-loeschen" type="button" class="knopf knopf-still">Trennen</button>
+        <button id="btn-raum-neu" type="button" class="knopf">Raum eröffnen</button>
+        <button id="btn-raum-beitreten" type="button" class="knopf knopf-still">Raum beitreten</button>
       </div>
-      <p id="fb-status" class="block-text"></p>
-    </details>
+
+      <form id="form-raum-neu" class="unterformular" hidden>
+        <label class="feld">
+          <span class="feld-label">Raumname</span>
+          <input id="in-raum-name" type="text" maxlength="40" placeholder="z. B. Eishalle Rosenheim" autocomplete="off">
+        </label>
+        <label class="feld">
+          <span class="feld-label">Passwort</span>
+          <input id="in-raum-pw" type="password" minlength="4" placeholder="mindestens 4 Zeichen" autocomplete="new-password">
+          <span class="feld-hilfe">Beides gibst du deinen Mitspielern weiter. Mehr brauchen sie nicht.</span>
+        </label>
+        <button type="submit" class="knopf knopf-voll">Raum eröffnen</button>
+      </form>
+
+      <form id="form-raum-beitreten" class="unterformular" hidden>
+        <label class="feld">
+          <span class="feld-label">Raumname</span>
+          <input id="in-beitritt-name" type="text" maxlength="40" placeholder="z. B. Eishalle Rosenheim" autocomplete="off">
+        </label>
+        <label class="feld">
+          <span class="feld-label">Passwort</span>
+          <input id="in-beitritt-pw" type="password" placeholder="Passwort des Raums" autocomplete="current-password">
+        </label>
+        <button type="submit" class="knopf knopf-voll">Beitreten</button>
+      </form>
+    </div>
 
     <details class="block">
       <summary>Endstände von Hand nachtragen</summary>

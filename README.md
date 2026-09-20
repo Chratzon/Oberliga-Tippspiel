@@ -26,65 +26,107 @@ Ohne HTTPS gibt es keinen Service Worker – lokal testen deshalb nicht per
 Doppelklick auf `index.html`, sondern mit `npx serve .` oder
 `python3 -m http.server`.
 
-## 2. Gruppen
+## 2. Was der Nutzer sieht
 
-Getippt wird in Gruppen. Jede Gruppe hat einen sechsstelligen Beitrittscode,
-eine eigene Rangliste und einen Gründer.
+Beim ersten Start eine Begrüßung mit genau zwei Möglichkeiten: Namen eingeben
+und loslegen, oder mit Google anmelden. Das war die gesamte Einrichtung.
+Von Firebase bekommt niemand etwas zu sehen – die Verbindung steht in
+`konfig.js` und wird beim Start von selbst aufgebaut.
 
-- **Gründen:** Profil → *Gruppe gründen*, Namen vergeben. Der Code wird erzeugt.
-- **Einladen:** *Einladen* legt Code und Link in die Zwischenablage bzw. öffnet
-  das Teilen-Menü des Geräts. Der Link öffnet die App und tritt direkt bei.
-- **Beitreten:** Profil → *Mit Code beitreten*.
-- **Schließen:** Nur der Gründer. Danach kommt niemand Neues mehr rein,
-  bestehende Mitspieler tippen weiter. Jederzeit umkehrbar.
-- **Mehrere Gruppen:** Man kann in beliebig vielen sein – Büro, Verein, Familie.
-  Oben in der Kopfzeile steht die aktive, umgeschaltet wird im Profil.
+Danach geht es in einen Raum: **Profil → Raum eröffnen** oder
+**Raum beitreten**. Ein Raum hat einen Namen und ein Passwort, beides gibst
+du deinen Mitspielern weiter. Mehr brauchen sie nicht.
 
-Die Tipps gehören dir, nicht der Gruppe: Du tippst einmal, das Ergebnis zählt
-in jeder Gruppe, in der du Mitglied bist. Wer eine Gruppe verlässt, behält
-seine Tipps und verschwindet nur aus deren Rangliste.
+Aus „Eishalle Rosenheim" wird intern `eishalle-rosenheim`. Groß- und
+Kleinschreibung, Leerzeichen und Umlaute sind also egal – „EISHALLE ROSENHEIM"
+führt in denselben Raum.
 
-Der Code ist die Einladung. Wer ihn hat, kann beitreten und die Tipps der
-Gruppe sehen – so wie bei jedem Tippspiel im Bekanntenkreis. Soll die Runde
-dicht sein, nach dem Beitritt aller einmal *Schließen* drücken.
+Der Einladungsknopf kopiert Raumnamen und Link. Das Passwort bewusst nicht:
+Es soll nicht in derselben Nachricht stehen wie der Zugang.
 
-## 3. Verbindung einrichten (Firebase)
+### Wie das Passwort geprüft wird
 
-Gruppen über mehrere Geräte brauchen eine Datenbank. Einmal für die ganze
-Gruppe einrichten:
+Nicht in der Oberfläche, sondern serverseitig. Die App bildet aus Raumname und
+Passwort einen SHA-256-Hash und schickt ihn beim Beitritt mit. Die
+Firestore-Regel vergleicht ihn mit dem hinterlegten Wert und lässt den Eintrag
+nur durch, wenn er stimmt.
+
+Das Passwort selbst verlässt das Gerät nie. Der hinterlegte Hash ist für
+niemanden lesbar – der Raum lässt sich erst nach dem Beitritt öffnen. Damit
+ist ein Durchprobieren nur über den Server möglich, nicht heimlich auf dem
+eigenen Rechner. Für eine Tipprunde ist das reichlich; ein Passwort wie
+`eishockey` wäre trotzdem keine gute Wahl.
+
+Wer nicht im Raum ist, sieht dessen Tipps nicht. Auch das steht in den Regeln,
+nicht nur in der Oberfläche.
+
+## 3. Konten und Gerätewechsel
+
+Ohne Anmeldung läuft alles über eine anonyme Kennung – bequem, aber an das
+Gerät gebunden. Browserspeicher geleert oder neues Handy heißt sonst: neu
+anfangen.
+
+Der Knopf **Mit Google anmelden** löst beides. Beim ersten Mal hängt er das
+Google-Konto an die bestehende Kennung; Tipps, Räume und Ranglistenplatz
+bleiben unberührt. Auf einem neuen Gerät erkennt die App, dass das Konto schon
+vergeben ist, meldet stattdessen an und holt Räume, Namen und Tipps zurück.
+Ein Knopf, beide Fälle.
+
+Beim Zurückholen hat Vorrang, was auf dem aktuellen Gerät schon getippt wurde.
+Ein frisch abgegebener Tipp wird also nicht von einem älteren aus der Cloud
+überschrieben.
+
+Dafür liegt unter `nutzer/{uid}` eine private Akte mit Raumliste und Tipps.
+Sie gehört ausschließlich dem jeweiligen Konto.
+
+In installierten PWAs, vor allem auf iOS, lassen manche Browser kein
+Anmeldefenster zu. Die App weicht dann auf eine Weiterleitung aus: Die Seite
+lädt einmal neu, danach ist man angemeldet.
+
+## 4. Firebase einrichten (nur du, einmalig)
 
 1. Auf console.firebase.google.com ein Projekt anlegen (Analytics kann aus bleiben).
-2. **Build → Authentication → Sign-in method** öffnen und dort **zwei** Anbieter
-   aktivieren: **Anonymous** (damit alle ohne Anmeldung sofort tippen können)
-   und **Google** (damit sich ein Profil später absichern lässt, siehe Abschnitt 4).
-3. **Build → Firestore Database → Create database**, Region Europa, Produktionsmodus.
-4. **Project settings → Your apps → Web app** hinzufügen. Der angezeigte
-   `firebaseConfig`-Block ist das, was in die App kommt.
-5. Unter *Firestore → Rules* diese Regeln setzen:
+2. **Build → Authentication → Sign-in method**: **Anonymous** und **Google**
+   aktivieren. Beide werden gebraucht.
+3. **Authentication → Settings → Authorized domains**: deine Pages-Adresse
+   eintragen, also `deinname.github.io`. Fehlt sie, schlägt jede Anmeldung fehl.
+4. **Build → Firestore Database → Create database**, Region eur3, Produktionsmodus.
+5. Unter *Firestore → Rules* diesen Regelsatz einsetzen und veröffentlichen:
 
 ```
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    match /runden/{gruppe} {
-      // get, nicht list: ohne Code findet niemand eine Gruppe
-      allow get:    if request.auth != null;
+    function istMitglied(raum) {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/raeume/$(raum)/teilnehmer/$(request.auth.uid));
+    }
+
+    match /raeume/{raum} {
+      // Stammdaten sieht nur, wer drin ist – der Passwort-Hash bleibt verborgen
+      allow get:    if istMitglied(raum);
       allow create: if request.auth != null
-                    && request.resource.data.ersteller == request.auth.uid;
+                    && request.resource.data.ersteller == request.auth.uid
+                    && request.resource.data.passwortHash is string;
       allow update, delete: if request.auth != null
                     && resource.data.ersteller == request.auth.uid;
 
       match /teilnehmer/{spieler} {
-        allow read:   if request.auth != null;
+        allow read:   if istMitglied(raum);
+        // Beitritt nur mit dem richtigen Nachweis
         allow create: if request.auth != null
                       && request.auth.uid == spieler
-                      && get(/databases/$(database)/documents/runden/$(gruppe)).data.offen == true;
-        allow update, delete: if request.auth != null && request.auth.uid == spieler;
+                      && request.resource.data.nachweis ==
+                         get(/databases/$(database)/documents/raeume/$(raum)).data.passwortHash;
+        allow update: if request.auth != null
+                      && request.auth.uid == spieler
+                      && request.resource.data.nachweis == resource.data.nachweis;
+        allow delete: if request.auth != null && request.auth.uid == spieler;
       }
     }
 
-    // Private Akte: Gruppen und Tipps zum Zurückholen auf einem neuen Gerät
+    // Private Akte zum Zurückholen auf einem neuen Gerät
     match /nutzer/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
@@ -92,69 +134,14 @@ service cloud.firestore {
 }
 ```
 
-Das erzwingt drei Dinge: Gruppen lassen sich nicht durchsuchen, nur über den
-Code öffnen. Jeder ändert nur den eigenen Eintrag. Und schließen darf nur der
-Gründer – die App blendet den Knopf bei den anderen aus, die Regel setzt es
-tatsächlich durch.
+6. **Project settings → Your apps → Web app** anlegen, den `firebaseConfig`-Block
+   kopieren und in `konfig.js` eintragen. Dort darf die JavaScript-Schreibweise
+   stehen, genau wie Firebase sie anzeigt.
+7. Pushen. Fertig – ab jetzt richtet niemand mehr etwas ein.
 
-6. In der App unter **Profil → Verbindung einrichten** die Konfiguration als
-   JSON einfügen und auf *Verbinden* tippen. Jeder Mitspieler macht das einmal
-   auf seinem Gerät.
-
-Die Schlüssel aus `firebaseConfig` sind keine Geheimnisse – sie stehen in jeder
-Firebase-Web-App im Quelltext. Der Schutz kommt aus den Regeln oben.
-
-### Empfohlen: Konfiguration fest hinterlegen
-
-Statt sie jedem Mitspieler zu schicken, trägst du sie einmal in `konfig.js`
-ein und pushst die Datei. Dann verbindet sich die App beim Start von selbst,
-das Eingabefeld im Profil verschwindet, und für deine Mitspieler sieht es so
-aus: Link antippen, Namen eingeben, tippen. Firebase bekommen sie nie zu
-Gesicht.
-
-In `konfig.js` darf der Block in JavaScript-Schreibweise stehen, also genau so,
-wie Firebase ihn anzeigt – die Anführungszeichen um die Schlüsselnamen sind nur
-im Eingabefeld der App nötig.
-
-Die Datei liegt damit im öffentlichen Repository. Das ist in Ordnung: Die
-Schlüssel identifizieren nur das Projekt, sie berechtigen zu nichts. Was
-jemand darf, entscheiden ausschließlich die Regeln oben. Wer den Beitrittscode
-nicht kennt, kommt in keine Gruppe.
-
-Ohne Verbindung funktioniert die App weiter, Gruppen bleiben dann aber leer:
-Du tippst allein auf deinem Gerät.
-
-## 4. Konten und Gerätewechsel
-
-Beim ersten Öffnen meldet die App jeden anonym an. Das reicht zum Tippen und
-kostet niemanden einen Klick – hängt aber am Browserspeicher des Geräts.
-Cache geleert oder neues Handy heißt sonst: neue Kennung, und man steht als
-zweiter Spieler in der eigenen Gruppe.
-
-Deshalb gibt es unter **Profil → Konto** zwei Knöpfe:
-
-- **Konto mit Google sichern** hängt ein Google-Konto an die bestehende
-  Kennung. Die Teilnehmer-ID ändert sich dabei nicht, Tipps und Gruppen
-  bleiben unangetastet. Einmal drücken genügt.
-- **Schon gesichert? Anmelden** ist der Weg auf einem neuen Gerät. Nach der
-  Anmeldung holt die App Gruppen, Namen und Tipps zurück.
-
-Beim Zurückholen hat das Vorrang, was auf dem aktuellen Gerät schon getippt
-wurde – ein frisch abgegebener Tipp wird also nicht von einem älteren aus der
-Cloud überschrieben.
-
-Technisch liegt dafür unter `nutzer/{uid}` eine private Akte mit Gruppenliste
-und Tipps. Sie gehört ausschließlich dem jeweiligen Konto; die Regeln oben
-lassen niemand anderen heran. Die Ranglisten lesen weiterhin nur die Einträge
-unter `runden/{code}/teilnehmer`.
-
-Wer den Knopf nie drückt, merkt von alledem nichts und tippt anonym weiter.
-
-Zwei Hinweise für die Praxis: In installierten PWAs, vor allem auf iOS, lassen
-manche Browser kein Anmeldefenster zu. Die App weicht dann selbsttätig auf eine
-Weiterleitung aus – die Seite lädt einmal neu, danach ist man angemeldet.
-Und die Anmeldung klappt nur, wenn deine Pages-Adresse unter *Authentication →
-Settings → Authorized domains* eingetragen ist.
+Die Schlüssel liegen damit im öffentlichen Repository. Das ist in Ordnung: Sie
+identifizieren nur das Projekt und berechtigen zu nichts. Was jemand darf,
+entscheiden ausschließlich die Regeln oben.
 
 ## 5. Daten aktuell halten
 

@@ -414,3 +414,57 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.
   padding: 9px 12px; margin: 0 0 12px;
   border-left: 3px solid var(--blaulinie); background: var(--eis-hell);
 }
+
+/* ---------- Begrüßung ---------- */
+
+.willkommen {
+  min-height: 100dvh;
+  display: grid; place-items: center;
+  padding: 32px 20px calc(32px + env(safe-area-inset-bottom));
+  background: var(--bande);
+}
+
+.willkommen-innen { width: 100%; max-width: 360px; color: #EAF2F7; }
+
+.willkommen-marke {
+  font-variation-settings: "wdth" 122;
+  font-size: 0.8rem; font-weight: 800; letter-spacing: 0.22em;
+  color: var(--mittellinie); text-transform: uppercase; margin-bottom: 6px;
+}
+
+.willkommen h1 {
+  font-variation-settings: "wdth" 112;
+  font-size: 1.9rem; font-weight: 800; line-height: 1.1;
+  letter-spacing: -0.02em; margin: 0 0 8px;
+}
+
+.willkommen-text { color: #8FA9BA; font-size: 0.92rem; margin: 0 0 22px; }
+
+.willkommen form { display: flex; flex-direction: column; gap: 10px; }
+
+.willkommen input {
+  background: var(--bande-weich); border-color: #3D5466; color: #FFFFFF;
+  font-size: 1rem; padding: 12px 14px;
+}
+.willkommen input::placeholder { color: #6A8296; }
+
+.willkommen .knopf-voll { background: #EAF2F7; color: var(--bande); border-color: #EAF2F7; padding: 12px; }
+
+.trenner {
+  display: flex; align-items: center; gap: 12px;
+  margin: 18px 0; color: #6A8296; font-size: 0.78rem;
+}
+.trenner::before, .trenner::after {
+  content: ''; flex: 1; height: 1px; background: #3D5466;
+}
+
+.willkommen .knopf-google {
+  background: transparent; color: #EAF2F7; border: 1px solid #4A6274;
+}
+
+.willkommen-fuss {
+  font-size: 0.76rem; color: #6A8296; line-height: 1.5; margin: 22px 0 0;
+}
+
+.konto-name { font-size: 0.9rem; margin: 0 0 6px; }
+.konto-name b { font-weight: 700; }

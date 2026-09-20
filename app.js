@@ -1,6 +1,6 @@
 /* Bully – Tippspiel Oberliga Süd 26/27 */
 
-import { Sync, GruppenFehler } from './sync.js';
+import { Sync, RaumFehler } from './sync.js';
 import { FIREBASE_KONFIG } from './konfig.js';
 
 /* ========== Wertung ========== */
@@ -42,10 +42,8 @@ const zustand = {
   tipps: {},               // spielId -> {h,a,art}
   fremdeTipps: {},         // teilnehmerId -> {name, tipps:{...}}
   eigeneKorrekturen: {},   // spielId -> {h,a,art}  (manuell nachgetragen)
-  gruppen: [],             // [{code, name, ersteller, offen}]
-  profil: { name: '', gruppe: null, id: null },
-  firebase: null,
-  festeKonfig: false,   // Verbindung kommt aus konfig.js
+  raeume: [],              // [{id, name, nachweis, ersteller}]
+  profil: { name: '', raum: null, id: null },
   konto: { angemeldet: false, anonym: true, name: '', email: '' },
   spieltag: 1,
   ansicht: 'tippen',
@@ -59,37 +57,24 @@ function laden() {
       const d = JSON.parse(roh);
       Object.assign(zustand.profil, d.profil || {});
       zustand.tipps = d.tipps || {};
-      zustand.gruppen = d.gruppen || [];
+      zustand.raeume = d.raeume || [];
       zustand.eigeneKorrekturen = d.eigeneKorrekturen || {};
-      zustand.firebase = d.firebase || null;
     }
   } catch (e) {
     console.warn('Gespeicherte Daten unlesbar, starte leer.', e);
   }
   if (!zustand.profil.id) zustand.profil.id = 'sp_' + Math.random().toString(36).slice(2, 11);
 
-  // Aus der Zeit vor den Gruppen: alter Rundencode wird zur Gruppe.
-  if (zustand.profil.runde && zustand.gruppen.length === 0) {
-    const code = String(zustand.profil.runde).toUpperCase();
-    zustand.gruppen.push({ code, name: zustand.profil.runde, ersteller: zustand.profil.id, offen: true });
-    zustand.profil.gruppe = code;
-  }
   delete zustand.profil.runde;
-
-  // Liegt eine feste Konfiguration bei, gilt die – nicht die gespeicherte.
-  if (FIREBASE_KONFIG && FIREBASE_KONFIG.projectId) {
-    zustand.firebase = FIREBASE_KONFIG;
-    zustand.festeKonfig = true;
-  }
+  delete zustand.profil.gruppe;
 }
 
 function sichern() {
   localStorage.setItem(SCHLUESSEL, JSON.stringify({
     profil: zustand.profil,
     tipps: zustand.tipps,
-    gruppen: zustand.gruppen,
+    raeume: zustand.raeume,
     eigeneKorrekturen: zustand.eigeneKorrekturen,
-    firebase: zustand.festeKonfig ? null : zustand.firebase,
   }));
 }
 
@@ -315,15 +300,14 @@ function tippFeld(spiel, tipp) {
 
   return el;
 }
-
 /* ========== Ansicht: Rangliste ========== */
 
-function aktiveGruppe() {
-  return zustand.gruppen.find((g) => g.code === zustand.profil.gruppe) || null;
+function aktiverRaum() {
+  return zustand.raeume.find((r) => r.id === zustand.profil.raum) || null;
 }
 
 function zeichneRangliste() {
-  const gruppe = aktiveGruppe();
+  const raum = aktiverRaum();
 
   const teilnehmer = [
     { id: zustand.profil.id, name: zustand.profil.name || 'Du', tipps: zustand.tipps, ich: true },
@@ -348,8 +332,7 @@ function zeichneRangliste() {
   }).sort((a, b) => b.punkte - a.punkte || b.treffer - a.treffer || a.name.localeCompare(b.name));
 
   const teile = [];
-  if (gruppe) teile.push(`${gruppe.name} · ${reihen.length} ${reihen.length === 1 ? 'Mitspieler' : 'Mitspieler'}`);
-  else teile.push('Keine Gruppe aktiv');
+  teile.push(raum ? `${raum.name} · ${reihen.length} Mitspieler` : 'Noch in keinem Raum');
   if (gewertet) teile.push(`${gewertet} gewertete ${gewertet === 1 ? 'Partie' : 'Partien'}`);
   $('#rang-info').textContent = teile.join(' · ');
 
@@ -396,33 +379,79 @@ function zeichneErgebnisse() {
 
 /* ========== Ansicht: Profil ========== */
 
-function zeichneGruppen() {
-  const liste = $('#gruppen-liste');
-  liste.innerHTML = '';
-  $('#gruppen-leer').hidden = zustand.gruppen.length > 0;
+function zeichneKonto() {
+  const k = zustand.konto;
+  const status = $('#konto-status');
+  const knoepfe = $('#konto-knoepfe');
 
-  for (const g of zustand.gruppen) {
-    const aktiv = g.code === zustand.profil.gruppe;
-    const meine = g.ersteller === zustand.profil.id;
+  $('#konto-name').textContent = zustand.profil.name || 'Unbenannt';
+
+  if (!Sync.verbunden()) {
+    status.textContent = 'Keine Verbindung. Du tippst gerade nur für dich auf diesem Gerät.';
+    knoepfe.innerHTML = '';
+    return;
+  }
+
+  if (!k.anonym) {
+    status.textContent = `Angemeldet mit Google${k.email ? ' · ' + k.email : ''}. `
+      + 'Auf einem neuen Gerät meldest du dich damit an und hast Räume und Tipps sofort wieder.';
+    knoepfe.innerHTML = '<button type="button" class="knopf knopf-still" data-tat="abmelden">Abmelden</button>';
+  } else {
+    status.textContent = 'Anonym unterwegs. Dein Profil hängt an diesem Gerät – '
+      + 'Browserspeicher geleert oder neues Handy heißt: neu anfangen.';
+    knoepfe.innerHTML = '<button type="button" class="knopf" data-tat="google">Mit Google anmelden</button>';
+  }
+
+  knoepfe.onclick = async (e) => {
+    const tat = e.target.closest('[data-tat]')?.dataset.tat;
+    if (!tat) return;
+    try {
+      if (tat === 'google') {
+        const ergebnis = await Sync.googleWaehlen();
+        if (ergebnis === null) return;               // Weiterleitung läuft
+        sichern();
+        kopfAktualisieren();
+        toast(ergebnis.zurueckgeholt
+          ? `Willkommen zurück: ${ergebnis.zurueckgeholt.raeume} Räume, ${ergebnis.zurueckgeholt.tipps} Tipps`
+          : 'Konto verbunden');
+      }
+      if (tat === 'abmelden') {
+        if (!confirm('Abmelden? Auf diesem Gerät bist du danach wieder anonym unterwegs.')) return;
+        await Sync.googleAbmelden();
+        sichern();
+        kopfAktualisieren();
+        toast('Abgemeldet');
+      }
+    } catch (err) { toast(err.message); }
+    zeichneProfil();
+  };
+}
+
+function zeichneRaeume() {
+  const liste = $('#raum-liste');
+  liste.innerHTML = '';
+  $('#raum-leer').hidden = zustand.raeume.length > 0;
+
+  for (const r of zustand.raeume) {
+    const aktiv = r.id === zustand.profil.raum;
+    const meiner = r.ersteller === zustand.profil.id;
     const anzahl = aktiv ? Object.keys(zustand.fremdeTipps).length : null;
 
     const li = document.createElement('li');
     li.className = 'gruppe' + (aktiv ? ' ist-aktiv' : '');
     li.innerHTML = `
       <div class="gruppe-kopf">
-        <span class="gruppe-name">${g.name}</span>
+        <span class="gruppe-name">${r.name}</span>
         ${aktiv ? '<span class="gruppe-marke">aktiv</span>' : ''}
       </div>
       <div class="gruppe-meta">
-        <span class="gruppe-code">${g.code}</span>
-        ${anzahl !== null ? `<span>${anzahl || 1} ${anzahl === 1 ? 'Mitspieler' : 'Mitspieler'}</span>` : ''}
-        ${meine ? '<span>von dir gegründet</span>' : ''}
-        ${g.offen === false ? '<span>geschlossen</span>' : ''}
+        <span class="gruppe-code">${r.id}</span>
+        ${anzahl ? `<span>${anzahl} Mitspieler</span>` : ''}
+        ${meiner ? '<span>von dir eröffnet</span>' : ''}
       </div>
       <div class="gruppe-aktionen">
         ${aktiv ? '' : '<button type="button" data-tat="wechseln">Aktivieren</button>'}
         <button type="button" data-tat="einladen">Einladen</button>
-        ${meine ? `<button type="button" data-tat="sperren">${g.offen === false ? 'Wieder öffnen' : 'Schließen'}</button>` : ''}
         <button type="button" data-tat="verlassen" class="tat-warnung">Verlassen</button>
       </div>`;
 
@@ -431,30 +460,22 @@ function zeichneGruppen() {
       if (!tat) return;
 
       if (tat === 'wechseln') {
-        Sync.gruppeWechseln(g.code);
+        Sync.raumWechseln(r.id);
         sichern();
         kopfAktualisieren();
-        zeichneGruppen();
-        toast(`„${g.name}“ ist aktiv`);
+        zeichneRaeume();
+        toast(`„${r.name}“ ist aktiv`);
       }
 
-      if (tat === 'einladen') await einladen(g);
-
-      if (tat === 'sperren') {
-        try {
-          await Sync.gruppeSperren(g.code, g.offen === false);
-          zeichneGruppen();
-          toast(g.offen === false ? 'Gruppe ist wieder offen' : 'Gruppe nimmt niemanden mehr auf');
-        } catch (err) { toast(err.message); }
-      }
+      if (tat === 'einladen') await einladen(r);
 
       if (tat === 'verlassen') {
-        if (!confirm(`„${g.name}“ wirklich verlassen? Deine Tipps bleiben erhalten, du tauchst dort aber nicht mehr auf.`)) return;
-        await Sync.gruppeVerlassen(g.code);
+        if (!confirm(`„${r.name}“ verlassen? Deine Tipps bleiben, du tauchst dort aber nicht mehr auf.`)) return;
+        await Sync.raumVerlassen(r.id);
         sichern();
         kopfAktualisieren();
-        zeichneGruppen();
-        toast('Gruppe verlassen');
+        zeichneRaeume();
+        toast('Raum verlassen');
       }
     });
 
@@ -462,94 +483,27 @@ function zeichneGruppen() {
   }
 }
 
-async function einladen(g) {
-  const link = Sync.einladungsLink(g.code);
-  const text = `Tipp mit bei „${g.name}“ – Code ${g.code}\n${link}`;
+async function einladen(r) {
+  const link = Sync.einladungsLink(r.id);
+  const text = `Tipp mit im Raum „${r.name}“\n${link}\n\nDas Passwort bekommst du von mir.`;
   if (navigator.share) {
-    try { await navigator.share({ title: g.name, text }); return; } catch { /* abgebrochen */ }
+    try { await navigator.share({ title: r.name, text }); return; } catch { /* abgebrochen */ }
   }
   try {
     await navigator.clipboard.writeText(text);
-    toast('Einladung kopiert');
+    toast('Einladung kopiert – Passwort separat schicken');
   } catch {
     prompt('Einladung kopieren:', text);
   }
 }
 
-function zeichneKonto() {
-  const k = zustand.konto;
-  const status = $('#konto-status');
-  const knoepfe = $('#konto-knoepfe');
-  knoepfe.innerHTML = '';
-
-  if (!Sync.verbunden()) {
-    $('#block-konto').hidden = true;
-    return;
-  }
-  $('#block-konto').hidden = false;
-
-  if (!k.anonym) {
-    status.textContent = `Gesichert über Google${k.email ? ' (' + k.email + ')' : ''}. `
-      + 'Auf einem neuen Gerät meldest du dich damit an und hast Gruppen und Tipps sofort wieder.';
-    knoepfe.innerHTML = '<button type="button" class="knopf knopf-still" data-tat="abmelden">Auf diesem Gerät abmelden</button>';
-  } else {
-    status.textContent = 'Dein Profil hängt an diesem Gerät. Wird der Browserspeicher geleert '
-      + 'oder wechselst du das Handy, fängst du als neuer Mitspieler an. '
-      + 'Ein Google-Konto anzuhängen behebt das – deine Tipps und Gruppen bleiben dabei erhalten.';
-    knoepfe.innerHTML =
-      '<button type="button" class="knopf" data-tat="sichern">Konto mit Google sichern</button>'
-      + '<button type="button" class="knopf knopf-still" data-tat="anmelden">Schon gesichert? Anmelden</button>';
-  }
-
-  knoepfe.onclick = async (e) => {
-    const tat = e.target.closest('[data-tat]')?.dataset.tat;
-    if (!tat) return;
-
-    try {
-      if (tat === 'sichern') {
-        const k2 = await Sync.googleVerknuepfen();
-        if (!k2) return;            // Weiterleitung läuft, Seite lädt neu
-        sichern();
-        toast('Konto gesichert');
-      }
-
-      if (tat === 'anmelden') {
-        const gefunden = await Sync.googleAnmelden();
-        if (gefunden === null) return;
-        sichern();
-        kopfAktualisieren();
-        toast(gefunden
-          ? `Willkommen zurück: ${gefunden.gruppen} Gruppen, ${gefunden.tipps} Tipps`
-          : 'Angemeldet. Zu diesem Konto war noch nichts gespeichert.');
-      }
-
-      if (tat === 'abmelden') {
-        if (!confirm('Abmelden? Auf diesem Gerät startest du danach als neuer Mitspieler, bis du dich wieder anmeldest.')) return;
-        await Sync.googleAbmelden();
-        sichern();
-        kopfAktualisieren();
-        toast('Abgemeldet');
-      }
-    } catch (err) {
-      toast(err.message);
-    }
-    zeichneProfil();
-  };
-}
-
 function zeichneProfil() {
   $('#in-name').value = zustand.profil.name;
   zeichneKonto();
-  zeichneGruppen();
+  zeichneRaeume();
 
-  // Ist die Verbindung fest hinterlegt, braucht niemand das Eingabefeld.
-  $('#block-verbindung').hidden = zustand.festeKonfig;
-  $('#feste-verbindung').hidden = !zustand.festeKonfig;
-  $('#feste-verbindung').textContent = Sync.statusText();
-  if (!zustand.festeKonfig) {
-    $('#in-firebase').value = zustand.firebase ? JSON.stringify(zustand.firebase, null, 2) : '';
-    $('#fb-status').textContent = Sync.statusText();
-  }
+  $('#hinweis-einrichtung').hidden = Boolean(FIREBASE_KONFIG && FIREBASE_KONFIG.projectId);
+
   $('#daten-stand').textContent = zustand.standDaten
     ? `Spielplan und Ergebnisse vom ${new Date(zustand.standDaten).toLocaleDateString('de-DE')}`
     : 'Spielplan aus der mitgelieferten Datei';
@@ -611,8 +565,8 @@ function zeige(name) {
 }
 
 function kopfAktualisieren() {
-  const g = aktiveGruppe();
-  $('#chip-gruppe').textContent = g ? g.name : 'Keine Gruppe';
+  const r = aktiverRaum();
+  $('#chip-gruppe').textContent = r ? r.name : 'Kein Raum';
 }
 
 function syncBand(text, fehler = false) {
@@ -622,26 +576,93 @@ function syncBand(text, fehler = false) {
   el.classList.toggle('ist-fehler', fehler);
 }
 
-/* Wird die App über einen Einladungslink geöffnet, direkt beitreten. */
-async function einladungPruefen() {
-  const code = new URLSearchParams(location.search).get('gruppe');
-  if (!code) return;
-  history.replaceState(null, '', location.pathname);
+/* ========== Begrüßung ========== */
 
-  try {
-    const daten = await Sync.gruppeBeitreten(code);
+function begruessungZeigen(an) {
+  $('#willkommen').hidden = !an;
+  $('#inhalt').hidden = an;
+  document.querySelector('.reiter').hidden = an;
+  document.querySelector('.tafel').hidden = an;
+}
+
+function begruessungAnbinden() {
+  $('#form-start').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = $('#in-startname').value.trim();
+    if (!name) { toast('Bitte einen Namen eingeben'); return; }
+    zustand.profil.name = name;
     sichern();
-    kopfAktualisieren();
-    toast(`Du bist jetzt bei „${daten.name}“ dabei`);
-  } catch (err) {
-    toast(err.message);
-    // Ohne Verbindung den Code merken, damit er nach dem Einrichten noch da ist.
-    if (!Sync.verbunden()) {
-      sessionStorage.setItem('bully.einladung', code.toUpperCase());
-      return code.toUpperCase();
-    }
-  }
-  return null;
+    Sync.mitgliedschaftenSchreiben().catch(() => {});
+    begruessungZeigen(false);
+    zeige(zustand.raeume.length ? 'tippen' : 'profil');
+    if (!zustand.raeume.length) toast('Jetzt noch einem Raum beitreten');
+  });
+
+  $('#btn-start-google').addEventListener('click', async () => {
+    try {
+      const ergebnis = await Sync.googleWaehlen();
+      if (ergebnis === null) return;
+      if (!zustand.profil.name) zustand.profil.name = ergebnis.konto.name || '';
+      sichern();
+      if (!zustand.profil.name) { $('#in-startname').focus(); return; }
+      kopfAktualisieren();
+      begruessungZeigen(false);
+      zeige(zustand.raeume.length ? 'tippen' : 'profil');
+    } catch (err) { toast(err.message); }
+  });
+}
+
+/* ========== Räume: Formulare ========== */
+
+function raumFormulareAnbinden() {
+  const umschalten = (welches) => {
+    $('#form-raum-neu').hidden = welches !== 'neu';
+    $('#form-raum-beitreten').hidden = welches !== 'beitreten';
+  };
+
+  $('#btn-raum-neu').addEventListener('click', () =>
+    umschalten($('#form-raum-neu').hidden ? 'neu' : null));
+  $('#btn-raum-beitreten').addEventListener('click', () =>
+    umschalten($('#form-raum-beitreten').hidden ? 'beitreten' : null));
+
+  $('#form-raum-neu').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const r = await Sync.raumErstellen($('#in-raum-name').value, $('#in-raum-pw').value);
+      sichern();
+      kopfAktualisieren();
+      zeichneRaeume();
+      umschalten(null);
+      $('#in-raum-name').value = '';
+      $('#in-raum-pw').value = '';
+      toast(`„${r.name}“ eröffnet`);
+    } catch (err) { toast(err.message); }
+  });
+
+  $('#form-raum-beitreten').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const r = await Sync.raumBeitreten($('#in-beitritt-name').value, $('#in-beitritt-pw').value);
+      sichern();
+      kopfAktualisieren();
+      zeichneRaeume();
+      umschalten(null);
+      $('#in-beitritt-name').value = '';
+      $('#in-beitritt-pw').value = '';
+      toast(`Willkommen in „${r.name}“`);
+    } catch (err) { toast(err.message); }
+  });
+}
+
+/* Einladungslink: Raumname vorbelegen, Passwort muss der Nutzer eingeben. */
+function einladungVorbelegen() {
+  const raum = new URLSearchParams(location.search).get('raum');
+  if (!raum) return false;
+  history.replaceState(null, '', location.pathname);
+  if (zustand.raeume.some((r) => r.id === raum)) return false;
+  $('#in-beitritt-name').value = raum;
+  $('#form-raum-beitreten').hidden = false;
+  return true;
 }
 
 /* ========== Start ========== */
@@ -659,110 +680,25 @@ async function start() {
 
   zustand.spieltag = aktuellerSpieltag();
 
-  // Reiter
   document.querySelectorAll('.reiter-knopf').forEach((b) =>
     b.addEventListener('click', () => zeige(b.dataset.view)));
   $('#btn-profil').addEventListener('click', () => zeige('profil'));
 
-  // Spieltag blättern
   $('#st-zurueck').addEventListener('click', () => { zustand.spieltag--; zeichneTippen(); });
   $('#st-vor').addEventListener('click', () => { zustand.spieltag++; zeichneTippen(); });
 
-  // Name speichern
   $('#profil-form').addEventListener('submit', (e) => {
     e.preventDefault();
     zustand.profil.name = $('#in-name').value.trim();
     sichern();
+    zeichneKonto();
     toast('Name gespeichert');
     Sync.mitgliedschaftenSchreiben().catch(() => {});
   });
 
-  // Gruppen
-  const umschalten = (welches) => {
-    $('#form-gruppe-neu').hidden = welches !== 'neu';
-    $('#form-gruppe-beitreten').hidden = welches !== 'beitreten';
-    if (welches === 'neu') $('#in-gruppe-name').focus();
-    if (welches === 'beitreten') $('#in-gruppe-code').focus();
-  };
+  begruessungAnbinden();
+  raumFormulareAnbinden();
 
-  $('#btn-gruppe-neu').addEventListener('click', () =>
-    umschalten($('#form-gruppe-neu').hidden ? 'neu' : null));
-  $('#btn-gruppe-beitreten').addEventListener('click', () =>
-    umschalten($('#form-gruppe-beitreten').hidden ? 'beitreten' : null));
-
-  $('#form-gruppe-neu').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const name = $('#in-gruppe-name').value;
-    try {
-      const g = await Sync.gruppeAnlegen(name);
-      sichern();
-      kopfAktualisieren();
-      zeichneGruppen();
-      umschalten(null);
-      $('#in-gruppe-name').value = '';
-      toast(`„${g.name}“ angelegt, Code ${g.code}`);
-      if (!Sync.verbunden()) {
-        toast('Ohne Verbindung bleibt die Gruppe auf diesem Gerät');
-      }
-    } catch (err) { toast(err.message); }
-  });
-
-  $('#form-gruppe-beitreten').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    try {
-      const daten = await Sync.gruppeBeitreten($('#in-gruppe-code').value);
-      sichern();
-      kopfAktualisieren();
-      zeichneGruppen();
-      umschalten(null);
-      $('#in-gruppe-code').value = '';
-      toast(`Willkommen bei „${daten.name}“`);
-    } catch (err) {
-      toast(err.message);
-      if (err instanceof GruppenFehler) { sichern(); kopfAktualisieren(); zeichneGruppen(); }
-    }
-  });
-
-  // Firebase
-  $('#btn-fb-speichern').addEventListener('click', async () => {
-    try {
-      zustand.firebase = JSON.parse($('#in-firebase').value);
-    } catch {
-      toast('Die Konfiguration ist kein gültiges JSON');
-      return;
-    }
-    sichern();
-    await Sync.neuVerbinden();
-    sichern();
-    $('#fb-status').textContent = Sync.statusText();
-
-    const gemerkt = sessionStorage.getItem('bully.einladung');
-    if (Sync.verbunden() && gemerkt) {
-      sessionStorage.removeItem('bully.einladung');
-      try {
-        const daten = await Sync.gruppeBeitreten(gemerkt);
-        sichern();
-        toast(`Verbunden und bei „${daten.name}“ dabei`);
-      } catch (err) { toast(err.message); }
-    } else {
-      toast(Sync.verbunden() ? 'Verbunden' : 'Verbindung fehlgeschlagen');
-    }
-
-    kopfAktualisieren();
-    zeichneGruppen();
-  });
-
-  $('#btn-fb-loeschen').addEventListener('click', () => {
-    zustand.firebase = null;
-    sichern();
-    Sync.trennen();
-    $('#in-firebase').value = '';
-    $('#fb-status').textContent = Sync.statusText();
-    syncBand('');
-    toast('Verbindung getrennt');
-  });
-
-  // Export / Import
   $('#btn-export').addEventListener('click', () => {
     const blob = new Blob([JSON.stringify({ profil: zustand.profil, tipps: zustand.tipps }, null, 2)],
       { type: 'application/json' });
@@ -788,9 +724,10 @@ async function start() {
     }
   });
 
-  // Sync starten
+  // Verbindung kommt ausschließlich aus konfig.js – ohne Zutun des Nutzers.
   Sync.init({
     zustand,
+    konfiguration: FIREBASE_KONFIG,
     beiAenderung: () => {
       kopfAktualisieren();
       if (zustand.ansicht === 'tabelle') zeichneRangliste();
@@ -798,18 +735,19 @@ async function start() {
     },
     beiStatus: syncBand,
   });
-  await Sync.neuVerbinden();
-  sichern();   // die von Firebase vergebene Teilnehmer-ID festhalten
+  await Sync.verbinden();
+  sichern();
 
-  const offeneEinladung = await einladungPruefen();
+  const wartendeEinladung = einladungVorbelegen();
 
-  if (offeneEinladung) {
-    zeige('profil');
-    $('#in-gruppe-code').value = offeneEinladung;
-    $('#form-gruppe-beitreten').hidden = false;
-  } else {
-    zeige('tippen');
+  if (!zustand.profil.name) {
+    begruessungZeigen(true);
+    $('#in-startname').focus();
+    return;
   }
+
+  begruessungZeigen(false);
+  zeige(wartendeEinladung || !zustand.raeume.length ? 'profil' : 'tippen');
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});

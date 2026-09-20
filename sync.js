@@ -1,40 +1,54 @@
-/* Sync- und Gruppenschicht.
-   Ohne Firebase-Konfiguration bleibt alles lokal: Gruppen lassen sich anlegen,
-   es sitzt aber niemand sonst darin. */
+/* Verbindung, Konto und Räume.
+ *
+ * Die Verbindung kommt aus konfig.js und wird beim Start von selbst
+ * aufgebaut. Der Nutzer richtet nichts ein – er wählt nur, ob er anonym
+ * bleibt oder sich mit Google anmeldet.
+ *
+ * Räume: Der Name ist die Adresse, das Passwort der Schlüssel. Geprüft wird
+ * serverseitig – die App schickt beim Beitritt einen Hash mit, und die
+ * Firestore-Regel vergleicht ihn mit dem hinterlegten. Das Passwort selbst
+ * verlässt das Gerät nie, und der hinterlegte Hash ist für niemanden lesbar.
+ */
 
 const CDN = 'https://www.gstatic.com/firebasejs/10.12.2';
 
-let ctx = null;          // { zustand, beiAenderung, beiStatus }
+let ctx = null;
 let db = null;
 let fs = null;
-let authM = null;        // Auth-Modul
-let authObj = null;      // Auth-Instanz
-let abmelden = [];       // aktive Listener
-let status = 'aus';      // aus | verbinde | verbunden | fehler
+let authM = null;
+let authObj = null;
+let abmelden = [];
+let status = 'aus';          // aus | verbinde | verbunden | fehler
 let fehlerText = '';
 let sendeTimer = null;
 
-const ZEICHEN = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // ohne I, O, 0, 1
+class RaumFehler extends Error {}
 
-function codeErzeugen() {
-  const werte = crypto.getRandomValues(new Uint8Array(6));
-  return [...werte].map((b) => ZEICHEN[b % ZEICHEN.length]).join('');
+function istAbbruch(e) {
+  return ['auth/popup-closed-by-user', 'auth/cancelled-popup-request'].includes(e?.code);
 }
-
-class GruppenFehler extends Error {}
 
 /* Manche Browser und installierte PWAs lassen kein Anmeldefenster zu.
    Dann weicht die App auf die Weiterleitung aus. */
 function istPopupProblem(e) {
-  return [
-    'auth/popup-blocked',
-    'auth/operation-not-supported-in-this-environment',
-  ].includes(e?.code);
+  return ['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment'].includes(e?.code);
 }
 
-/* Vom Nutzer selbst abgebrochen – kein Fehler, nur nichts passiert. */
-function istAbbruch(e) {
-  return ['auth/popup-closed-by-user', 'auth/cancelled-popup-request'].includes(e?.code);
+/* Aus „Eishalle Rosenheim“ wird „eishalle-rosenheim“. */
+export function raumSchluessel(name) {
+  return (name || '').trim().toLowerCase()
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+}
+
+/* Der Nachweis ist ein Hash aus Raumname und Passwort. Der Raumname geht mit
+   ein, damit dasselbe Passwort in zwei Räumen nicht denselben Wert ergibt. */
+async function nachweisBilden(raumId, passwort) {
+  const roh = new TextEncoder().encode(`bully:${raumId}:${passwort}`);
+  const puffer = await crypto.subtle.digest('SHA-256', roh);
+  return [...new Uint8Array(puffer)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 export const Sync = {
@@ -45,27 +59,26 @@ export const Sync = {
 
   statusText() {
     switch (status) {
-      case 'verbunden': return 'Verbunden. Gruppen laufen über alle Geräte zusammen.';
+      case 'verbunden': return 'Verbunden.';
       case 'verbinde':  return 'Verbindung wird aufgebaut …';
       case 'fehler':    return 'Verbindung fehlgeschlagen: ' + fehlerText;
-      default:          return 'Nicht verbunden. Gruppen und Tipps bleiben auf diesem Gerät.';
+      default:          return 'Nicht verbunden.';
     }
   },
 
   /* ---------- Verbindung ---------- */
 
-  async neuVerbinden() {
-    this.trennen();
-    const cfg = ctx?.zustand.firebase;
+  async verbinden() {
+    this.abbauen();
+    const cfg = ctx?.konfiguration;
     if (!cfg || !cfg.projectId) {
       status = 'aus';
-      ctx?.beiStatus('');
-      ctx?.beiAenderung();
+      ctx?.beiStatus('Nicht eingerichtet – Tipps bleiben auf diesem Gerät.', true);
       return;
     }
 
     status = 'verbinde';
-    ctx.beiStatus('Gruppen werden synchronisiert …');
+    ctx.beiStatus('Verbindung wird aufgebaut …');
 
     try {
       const [{ initializeApp, getApps, deleteApp }, auth, firestore] = await Promise.all([
@@ -74,16 +87,14 @@ export const Sync = {
         import(`${CDN}/firebase-firestore.js`),
       ]);
       fs = firestore;
+      authM = auth;
 
       getApps().forEach((a) => deleteApp(a).catch(() => {}));
       const app = initializeApp(cfg);
-
-      authM = auth;
       authObj = auth.getAuth(app);
       db = fs.getFirestore(app);
 
-      // Kehrt der Nutzer von einer Google-Weiterleitung zurück, ist er hier
-      // schon angemeldet – dann keine neue anonyme Kennung erzeugen.
+      // Rückkehr von einer Google-Weiterleitung: dann keine neue anonyme Kennung.
       const rueckkehr = await auth.getRedirectResult(authObj).catch(() => null);
       if (!authObj.currentUser) await auth.signInAnonymously(authObj);
 
@@ -100,11 +111,11 @@ export const Sync = {
       status = 'fehler';
       fehlerText = e?.message || String(e);
       console.error(e);
-      ctx.beiStatus('Gruppen offline – ' + fehlerText, true);
+      ctx.beiStatus('Offline – ' + fehlerText, true);
     }
   },
 
-  trennen() {
+  abbauen() {
     abmelden.forEach((f) => { try { f(); } catch {} });
     abmelden = [];
     db = null;
@@ -116,88 +127,194 @@ export const Sync = {
   kontoInfo() {
     const u = authObj?.currentUser;
     if (!u) return { angemeldet: false, anonym: true, name: '', email: '' };
-    return {
-      angemeldet: true,
-      anonym: u.isAnonymous,
-      name: u.displayName || '',
-      email: u.email || '',
-    };
+    return { angemeldet: true, anonym: u.isAnonymous, name: u.displayName || '', email: u.email || '' };
   },
 
-  /* Hängt ein Google-Konto an die bestehende anonyme Kennung.
-     Die Teilnehmer-ID bleibt dieselbe, Tipps und Gruppen bleiben, wo sie sind. */
-  async googleVerknuepfen() {
-    if (!authObj || status !== 'verbunden') throw new GruppenFehler('Dafür braucht es eine Verbindung.');
+  /* Ein Knopf für beide Fälle: Erst versuchen, das Google-Konto an die
+     bestehende Kennung zu hängen. Gehört es schon zu einem Profil, wird
+     stattdessen angemeldet und der frühere Stand zurückgeholt. */
+  async googleWaehlen() {
+    if (!authObj || status !== 'verbunden') throw new RaumFehler('Keine Verbindung.');
     const anbieter = new authM.GoogleAuthProvider();
 
     try {
       await authM.linkWithPopup(authObj.currentUser, anbieter);
+      ctx.zustand.konto = this.kontoInfo();
+      await this.nutzerAkteSchreiben();
+      return { konto: ctx.zustand.konto, zurueckgeholt: null };
     } catch (e) {
-      if (istAbbruch(e)) throw new GruppenFehler('Abgebrochen.');
+      if (istAbbruch(e)) throw new RaumFehler('Abgebrochen.');
+
       if (istPopupProblem(e)) {
         await authM.linkWithRedirect(authObj.currentUser, anbieter);
-        return null;   // die Seite lädt neu
+        return null;
       }
-      if (e.code === 'auth/credential-already-in-use') {
-        throw new GruppenFehler('Dieses Google-Konto gehört schon zu einem anderen Profil. Nimm stattdessen „Mit Google anmelden“.');
-      }
-      if (e.code === 'auth/email-already-in-use') {
-        throw new GruppenFehler('Zu dieser Adresse gibt es schon ein Profil. Nimm „Mit Google anmelden“.');
-      }
-      throw new GruppenFehler(e.message);
+
+      const schonVergeben = ['auth/credential-already-in-use', 'auth/email-already-in-use']
+        .includes(e.code);
+      if (!schonVergeben) throw new RaumFehler(e.message);
     }
 
-    ctx.zustand.konto = this.kontoInfo();
-    await this.nutzerAkteSchreiben();
-    return ctx.zustand.konto;
-  },
-
-  /* Auf einem neuen Gerät: anmelden und den eigenen Stand zurückholen. */
-  async googleAnmelden() {
-    if (!authObj || status !== 'verbunden') throw new GruppenFehler('Dafür braucht es eine Verbindung.');
-    const anbieter = new authM.GoogleAuthProvider();
-
+    // Das Konto gibt es schon: anmelden statt verknüpfen.
     try {
       await authM.signInWithPopup(authObj, anbieter);
     } catch (e) {
-      if (istAbbruch(e)) throw new GruppenFehler('Abgebrochen.');
+      if (istAbbruch(e)) throw new RaumFehler('Abgebrochen.');
       if (istPopupProblem(e)) {
         await authM.signInWithRedirect(authObj, anbieter);
         return null;
       }
-      throw new GruppenFehler(e.message);
+      throw new RaumFehler(e.message);
     }
 
     ctx.zustand.profil.id = authObj.currentUser.uid;
     ctx.zustand.konto = this.kontoInfo();
-    const gefunden = await this.wiederherstellen();
+    const zurueckgeholt = await this.wiederherstellen();
     await this.mitgliedschaftenSchreiben();
     this.zuhoeren();
-    return gefunden;
+    return { konto: ctx.zustand.konto, zurueckgeholt };
   },
 
   async googleAbmelden() {
     if (!authObj) return;
     await authM.signOut(authObj);
+    ctx.zustand.raeume = [];
+    ctx.zustand.profil.raum = null;
     ctx.zustand.konto = { angemeldet: false, anonym: true, name: '', email: '' };
-    this.trennen();
-    await this.neuVerbinden();
+    this.abbauen();
+    await this.verbinden();
   },
 
-  /* Eigene Akte: privat, nur für das Zurückholen auf einem neuen Gerät. */
+  /* ---------- Räume ---------- */
+
+  async raumErstellen(nameRoh, passwort) {
+    const name = (nameRoh || '').trim();
+    const id = raumSchluessel(name);
+    if (id.length < 3) throw new RaumFehler('Der Raumname braucht mindestens drei Zeichen.');
+    if ((passwort || '').length < 4) throw new RaumFehler('Das Passwort braucht mindestens vier Zeichen.');
+    if (!db || status !== 'verbunden') throw new RaumFehler('Keine Verbindung.');
+    if (ctx.zustand.raeume.some((r) => r.id === id)) throw new RaumFehler('In diesem Raum bist du schon.');
+
+    const nachweis = await nachweisBilden(id, passwort);
+
+    try {
+      await fs.setDoc(fs.doc(db, 'raeume', id), {
+        name,
+        passwortHash: nachweis,
+        ersteller: ctx.zustand.profil.id,
+        erstellt: new Date().toISOString(),
+      });
+    } catch (e) {
+      if (e.code === 'permission-denied') {
+        throw new RaumFehler(`Den Raum „${name}“ gibt es schon. Tritt ihm bei oder nimm einen anderen Namen.`);
+      }
+      throw new RaumFehler(e.message);
+    }
+
+    const eintrag = { id, name, nachweis, ersteller: ctx.zustand.profil.id };
+    ctx.zustand.raeume.push(eintrag);
+    ctx.zustand.profil.raum = id;
+    await this.mitgliedschaftenSchreiben();
+    this.zuhoeren();
+    return eintrag;
+  },
+
+  async raumBeitreten(nameRoh, passwort) {
+    const id = raumSchluessel(nameRoh);
+    if (!id) throw new RaumFehler('Bitte einen Raumnamen eingeben.');
+    if (!db || status !== 'verbunden') throw new RaumFehler('Keine Verbindung.');
+
+    if (ctx.zustand.raeume.some((r) => r.id === id)) {
+      ctx.zustand.profil.raum = id;
+      this.zuhoeren();
+      throw new RaumFehler('In diesem Raum bist du schon – er ist jetzt aktiv.');
+    }
+
+    const nachweis = await nachweisBilden(id, passwort || '');
+
+    try {
+      await fs.setDoc(fs.doc(db, 'raeume', id, 'teilnehmer', ctx.zustand.profil.id), {
+        name: ctx.zustand.profil.name || 'Unbenannt',
+        tipps: ctx.zustand.tipps,
+        nachweis,
+        aktualisiert: new Date().toISOString(),
+      });
+    } catch (e) {
+      if (e.code === 'permission-denied') {
+        throw new RaumFehler('Raumname oder Passwort stimmt nicht.');
+      }
+      throw new RaumFehler(e.message);
+    }
+
+    // Ab jetzt sind wir Mitglied und dürfen die Stammdaten lesen.
+    const stamm = await fs.getDoc(fs.doc(db, 'raeume', id)).catch(() => null);
+    const eintrag = {
+      id,
+      name: stamm?.data()?.name || nameRoh.trim(),
+      nachweis,
+      ersteller: stamm?.data()?.ersteller || null,
+    };
+
+    ctx.zustand.raeume.push(eintrag);
+    ctx.zustand.profil.raum = id;
+    await this.nutzerAkteSchreiben();
+    this.zuhoeren();
+    return eintrag;
+  },
+
+  async raumVerlassen(id) {
+    if (db && status === 'verbunden') {
+      await fs.deleteDoc(fs.doc(db, 'raeume', id, 'teilnehmer', ctx.zustand.profil.id)).catch(() => {});
+    }
+    ctx.zustand.raeume = ctx.zustand.raeume.filter((r) => r.id !== id);
+    if (ctx.zustand.profil.raum === id) {
+      ctx.zustand.profil.raum = ctx.zustand.raeume[0]?.id || null;
+    }
+    await this.nutzerAkteSchreiben();
+    this.zuhoeren();
+  },
+
+  raumWechseln(id) {
+    ctx.zustand.profil.raum = id;
+    this.zuhoeren();
+  },
+
+  einladungsLink(id) {
+    const u = new URL(location.href);
+    u.hash = '';
+    u.search = '?raum=' + encodeURIComponent(id);
+    return u.toString();
+  },
+
+  /* ---------- Schreiben und Zuhören ---------- */
+
+  async mitgliedschaftenSchreiben() {
+    if (!db || status !== 'verbunden') return;
+    const { profil, tipps, raeume } = ctx.zustand;
+    await Promise.all(raeume.map((r) =>
+      fs.setDoc(fs.doc(db, 'raeume', r.id, 'teilnehmer', profil.id), {
+        name: profil.name || 'Unbenannt',
+        tipps,
+        nachweis: r.nachweis,
+        aktualisiert: new Date().toISOString(),
+      }).catch((e) => console.warn(`Raum ${r.id}: ${e.message}`))
+    ));
+    await this.nutzerAkteSchreiben();
+  },
+
+  /* Private Akte – nur zum Zurückholen auf einem anderen Gerät. */
   async nutzerAkteSchreiben() {
     if (!db || status !== 'verbunden') return;
-    const { profil, tipps, gruppen } = ctx.zustand;
+    const { profil, tipps, raeume } = ctx.zustand;
     await fs.setDoc(fs.doc(db, 'nutzer', profil.id), {
       name: profil.name || '',
-      gruppen,
+      raeume,
       tipps,
       aktualisiert: new Date().toISOString(),
     }).catch((e) => console.warn('Nutzerakte: ' + e.message));
   },
 
-  /* Beim Anmelden auf einem neuen Gerät: Gruppen, Name und Tipps zurückholen.
-     Was auf diesem Gerät schon getippt wurde, hat Vorrang. */
+  /* Was auf diesem Gerät schon getippt wurde, hat Vorrang. */
   async wiederherstellen() {
     if (!db) return null;
     const schnappschuss = await fs.getDoc(fs.doc(db, 'nutzer', ctx.zustand.profil.id)).catch(() => null);
@@ -206,117 +323,14 @@ export const Sync = {
     const d = schnappschuss.data();
     ctx.zustand.tipps = { ...(d.tipps || {}), ...ctx.zustand.tipps };
 
-    const vorhanden = new Set(ctx.zustand.gruppen.map((g) => g.code));
-    for (const g of (d.gruppen || [])) {
-      if (!vorhanden.has(g.code)) ctx.zustand.gruppen.push(g);
+    const vorhanden = new Set(ctx.zustand.raeume.map((r) => r.id));
+    for (const r of (d.raeume || [])) {
+      if (!vorhanden.has(r.id)) ctx.zustand.raeume.push(r);
     }
     if (!ctx.zustand.profil.name && d.name) ctx.zustand.profil.name = d.name;
-    if (!ctx.zustand.profil.gruppe) ctx.zustand.profil.gruppe = ctx.zustand.gruppen[0]?.code || null;
+    if (!ctx.zustand.profil.raum) ctx.zustand.profil.raum = ctx.zustand.raeume[0]?.id || null;
 
-    return { gruppen: (d.gruppen || []).length, tipps: Object.keys(d.tipps || {}).length };
-  },
-
-  /* ---------- Gruppen ---------- */
-
-  async gruppeAnlegen(name) {
-    const code = codeErzeugen();
-    const eintrag = {
-      code,
-      name: name.trim() || 'Tipprunde',
-      ersteller: ctx.zustand.profil.id,
-      offen: true,
-    };
-
-    if (db && status === 'verbunden') {
-      await fs.setDoc(fs.doc(db, 'runden', code), {
-        name: eintrag.name,
-        ersteller: eintrag.ersteller,
-        offen: true,
-        erstellt: new Date().toISOString(),
-      });
-    }
-
-    ctx.zustand.gruppen.push(eintrag);
-    ctx.zustand.profil.gruppe = code;
-    await this.mitgliedschaftenSchreiben();
-    this.zuhoeren();
-    return eintrag;
-  },
-
-  async gruppeBeitreten(codeRoh) {
-    const code = (codeRoh || '').trim().toUpperCase();
-    if (!code) throw new GruppenFehler('Bitte einen Code eingeben.');
-
-    if (ctx.zustand.gruppen.some((g) => g.code === code)) {
-      ctx.zustand.profil.gruppe = code;
-      this.zuhoeren();
-      throw new GruppenFehler('In dieser Gruppe bist du schon – sie ist jetzt aktiv.');
-    }
-
-    if (!db || status !== 'verbunden') {
-      throw new GruppenFehler('Ohne Verbindung geht das nicht. Erst unter „Verbindung einrichten“ verbinden.');
-    }
-
-    const schnappschuss = await fs.getDoc(fs.doc(db, 'runden', code));
-    if (!schnappschuss.exists()) throw new GruppenFehler('Diesen Code gibt es nicht. Tippfehler?');
-
-    const daten = schnappschuss.data();
-    if (daten.offen === false) {
-      throw new GruppenFehler(`„${daten.name}“ nimmt keine neuen Mitspieler mehr auf.`);
-    }
-
-    ctx.zustand.gruppen.push({ code, name: daten.name, ersteller: daten.ersteller, offen: daten.offen });
-    ctx.zustand.profil.gruppe = code;
-    await this.mitgliedschaftenSchreiben();
-    this.zuhoeren();
-    return daten;
-  },
-
-  async gruppeVerlassen(code) {
-    if (db && status === 'verbunden') {
-      await fs.deleteDoc(fs.doc(db, 'runden', code, 'teilnehmer', ctx.zustand.profil.id)).catch(() => {});
-    }
-    ctx.zustand.gruppen = ctx.zustand.gruppen.filter((g) => g.code !== code);
-    if (ctx.zustand.profil.gruppe === code) {
-      ctx.zustand.profil.gruppe = ctx.zustand.gruppen[0]?.code || null;
-    }
-    this.zuhoeren();
-  },
-
-  gruppeWechseln(code) {
-    ctx.zustand.profil.gruppe = code;
-    this.zuhoeren();
-  },
-
-  /* Nur der Gründer darf auf- und zusperren, die Firestore-Regeln erzwingen das. */
-  async gruppeSperren(code, offen) {
-    if (!db || status !== 'verbunden') throw new GruppenFehler('Dafür braucht es eine Verbindung.');
-    await fs.updateDoc(fs.doc(db, 'runden', code), { offen });
-    const g = ctx.zustand.gruppen.find((x) => x.code === code);
-    if (g) g.offen = offen;
-  },
-
-  einladungsLink(code) {
-    const u = new URL(location.href);
-    u.hash = '';
-    u.search = '?gruppe=' + code;
-    return u.toString();
-  },
-
-  /* ---------- Schreiben und Zuhören ---------- */
-
-  /* Die eigenen Tipps landen in jeder Gruppe, in der man Mitglied ist. */
-  async mitgliedschaftenSchreiben() {
-    if (!db || status !== 'verbunden') return;
-    const { profil, tipps, gruppen } = ctx.zustand;
-    await Promise.all(gruppen.map((g) =>
-      fs.setDoc(fs.doc(db, 'runden', g.code, 'teilnehmer', profil.id), {
-        name: profil.name || 'Unbenannt',
-        tipps,
-        aktualisiert: new Date().toISOString(),
-      }).catch((e) => console.warn(`Gruppe ${g.code}: ${e.message}`))
-    ));
-    await this.nutzerAkteSchreiben();
+    return { raeume: (d.raeume || []).length, tipps: Object.keys(d.tipps || {}).length };
   },
 
   zuhoeren() {
@@ -326,12 +340,11 @@ export const Sync = {
 
     if (!db || status !== 'verbunden') { ctx.beiAenderung(); return; }
 
-    const code = ctx.zustand.profil.gruppe;
-    if (!code) { ctx.beiAenderung(); return; }
+    const id = ctx.zustand.profil.raum;
+    if (!id) { ctx.beiAenderung(); return; }
 
-    // Mitspieler der aktiven Gruppe
     abmelden.push(fs.onSnapshot(
-      fs.collection(db, 'runden', code, 'teilnehmer'),
+      fs.collection(db, 'raeume', id, 'teilnehmer'),
       (schnappschuss) => {
         const alle = {};
         schnappschuss.forEach((doc) => { alle[doc.id] = doc.data(); });
@@ -340,19 +353,14 @@ export const Sync = {
       },
       (e) => {
         fehlerText = e.message;
-        ctx.beiStatus('Gruppe offline – ' + e.message, true);
+        ctx.beiStatus('Raum offline – ' + e.message, true);
       }
     ));
 
-    // Stammdaten der Gruppe: Name, offen oder geschlossen
-    abmelden.push(fs.onSnapshot(fs.doc(db, 'runden', code), (doc) => {
+    abmelden.push(fs.onSnapshot(fs.doc(db, 'raeume', id), (doc) => {
       if (!doc.exists()) return;
-      const g = ctx.zustand.gruppen.find((x) => x.code === code);
-      if (g) Object.assign(g, {
-        name: doc.data().name,
-        offen: doc.data().offen,
-        ersteller: doc.data().ersteller,
-      });
+      const r = ctx.zustand.raeume.find((x) => x.id === id);
+      if (r) { r.name = doc.data().name; r.ersteller = doc.data().ersteller; }
       ctx.beiAenderung();
     }, () => {}));
   },
@@ -368,4 +376,4 @@ export const Sync = {
   },
 };
 
-export { GruppenFehler };
+export { RaumFehler };
