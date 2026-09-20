@@ -31,7 +31,15 @@ function istAbbruch(e) {
 /* Manche Browser und installierte PWAs lassen kein Anmeldefenster zu.
    Dann weicht die App auf die Weiterleitung aus. */
 function istPopupProblem(e) {
-  return ['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment'].includes(e?.code);
+  return ['auth/popup-blocked', 'auth/popup-closed-by-user',
+          'auth/operation-not-supported-in-this-environment'].includes(e?.code);
+}
+
+/* Als installierte App läuft die Anmeldung grundsätzlich über eine
+   Weiterleitung – Popups werden dort zuverlässig blockiert. */
+function ohneFenster() {
+  return window.matchMedia('(display-mode: standalone)').matches
+    || navigator.standalone === true;
 }
 
 /* Aus „Eishalle Rosenheim“ wird „eishalle-rosenheim“. */
@@ -95,7 +103,18 @@ export const Sync = {
       db = fs.getFirestore(app);
 
       // Rückkehr von einer Google-Weiterleitung: dann keine neue anonyme Kennung.
-      const rueckkehr = await auth.getRedirectResult(authObj).catch(() => null);
+      let rueckkehr = null;
+      try {
+        rueckkehr = await auth.getRedirectResult(authObj);
+      } catch (e) {
+        // Das Konto gehört schon zu einem Profil: damit anmelden statt verknüpfen.
+        if (['auth/credential-already-in-use', 'auth/email-already-in-use'].includes(e.code)) {
+          const zugang = auth.GoogleAuthProvider.credentialFromError(e);
+          if (zugang) rueckkehr = await auth.signInWithCredential(authObj, zugang);
+        } else {
+          console.warn('Weiterleitung: ' + e.message);
+        }
+      }
       if (!authObj.currentUser) await auth.signInAnonymously(authObj);
 
       ctx.zustand.profil.id = authObj.currentUser.uid;
@@ -136,6 +155,11 @@ export const Sync = {
   async googleWaehlen() {
     if (!authObj || status !== 'verbunden') throw new RaumFehler('Keine Verbindung.');
     const anbieter = new authM.GoogleAuthProvider();
+
+    if (ohneFenster()) {
+      await authM.linkWithRedirect(authObj.currentUser, anbieter);
+      return null;                      // die Seite lädt neu
+    }
 
     try {
       await authM.linkWithPopup(authObj.currentUser, anbieter);

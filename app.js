@@ -722,6 +722,69 @@ const AUGE_AUF = `<svg viewBox="0 0 24 24" aria-hidden="true">
   <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/>
   <circle cx="12" cy="12" r="3"/><path d="M4 20L20 4"/></svg>`;
 
+/* ========== Laufende Aktualisierung ========== */
+
+const NACHSPIELZEIT_MS = 3 * 60 * 60 * 1000;   // bis 3 Stunden nach Anpfiff
+const TAKT_MS = 10 * 60 * 1000;                // alle 10 Minuten nachsehen
+
+let letzterAbruf = 0;
+let gesperrtStand = '';
+
+/* Läuft gerade mindestens eine Partie – oder liegt ihr Anpfiff
+   weniger als drei Stunden zurück? */
+function spieleLaufen() {
+  const jetzt = Date.now();
+  return zustand.spielplan.spiele.some((s) => {
+    const start = anpfiff(s).getTime();
+    return jetzt >= start && jetzt <= start + NACHSPIELZEIT_MS && !ergebnisVon(s.id);
+  });
+}
+
+async function ergebnisseErneuern() {
+  try {
+    const antwort = await fetch('data/ergebnisse.json?t=' + Date.now(), { cache: 'no-store' });
+    const erg = await antwort.json();
+    const vorher = JSON.stringify(zustand.ergebnisse);
+    zustand.ergebnisse = erg.ergebnisse || {};
+    zustand.standDaten = erg.aktualisiert || null;
+    letzterAbruf = Date.now();
+
+    if (JSON.stringify(zustand.ergebnisse) !== vorher) {
+      zeige(zustand.ansicht);
+      toast('Ergebnisse aktualisiert');
+    }
+  } catch {
+    // Kein Netz: beim nächsten Durchlauf erneut versuchen.
+  }
+}
+
+/* Ein Takt für beides: Tipps sperren, sobald ein Spiel beginnt,
+   und während der Spiele die Endstände nachladen. */
+function taktStarten() {
+  const pruefen = () => {
+    // Welche Partien sind gerade gesperrt? Ändert sich das, neu zeichnen.
+    const stand = zustand.spielplan.spiele
+      .filter((s) => istGesperrt(s)).map((s) => s.id).join(',');
+    if (stand !== gesperrtStand) {
+      gesperrtStand = stand;
+      if (zustand.ansicht === 'tippen') zeichneTippen();
+    }
+
+    if (spieleLaufen() && Date.now() - letzterAbruf > TAKT_MS) {
+      ergebnisseErneuern();
+    }
+  };
+
+  pruefen();
+  setInterval(pruefen, 30 * 1000);
+
+  // Wer die App aus dem Hintergrund holt, soll sofort den aktuellen Stand sehen.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (spieleLaufen() || Date.now() - letzterAbruf > TAKT_MS) ergebnisseErneuern();
+  });
+}
+
 /* ========== Banner, Aktualisierung, Installation ========== */
 
 let installAngebot = null;      // beforeinstallprompt, aufgehoben
@@ -928,6 +991,7 @@ async function start() {
   const wartendeEinladung = einladungVorbelegen();
 
   aktualisierungUeberwachen();
+  taktStarten();
 
   if (!zustand.profil.name) {
     begruessungZeigen(true);
