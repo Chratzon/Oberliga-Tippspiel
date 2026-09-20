@@ -7,6 +7,7 @@ Mitspieler zusammen.
 
 ```
 index.html · app.css · app.js · sync.js   → die App
+konfig.js                                  → Firebase-Zugang (einmal eintragen)
 data/spielplan.json                        → Teams und alle Ansetzungen
 data/ergebnisse.json                       → Endstände, von der Action gepflegt
 scripts/scrape.mjs                         → holt beides von hockeyweb.de
@@ -53,7 +54,9 @@ Gruppen über mehrere Geräte brauchen eine Datenbank. Einmal für die ganze
 Gruppe einrichten:
 
 1. Auf console.firebase.google.com ein Projekt anlegen (Analytics kann aus bleiben).
-2. **Build → Authentication → Sign-in method → Anonymous** aktivieren.
+2. **Build → Authentication → Sign-in method** öffnen und dort **zwei** Anbieter
+   aktivieren: **Anonymous** (damit alle ohne Anmeldung sofort tippen können)
+   und **Google** (damit sich ein Profil später absichern lässt, siehe Abschnitt 4).
 3. **Build → Firestore Database → Create database**, Region Europa, Produktionsmodus.
 4. **Project settings → Your apps → Web app** hinzufügen. Der angezeigte
    `firebaseConfig`-Block ist das, was in die App kommt.
@@ -80,6 +83,11 @@ service cloud.firestore {
         allow update, delete: if request.auth != null && request.auth.uid == spieler;
       }
     }
+
+    // Private Akte: Gruppen und Tipps zum Zurückholen auf einem neuen Gerät
+    match /nutzer/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
   }
 }
 ```
@@ -96,14 +104,59 @@ tatsächlich durch.
 Die Schlüssel aus `firebaseConfig` sind keine Geheimnisse – sie stehen in jeder
 Firebase-Web-App im Quelltext. Der Schutz kommt aus den Regeln oben.
 
-Wer die Konfiguration nicht jedem einzeln schicken will, legt sie fest in
-`app.js` ab: im `zustand` das Feld `firebase` mit dem Objekt vorbelegen. Dann
-reicht der Einladungslink, und der Beitritt läuft in einem Schritt.
+### Empfohlen: Konfiguration fest hinterlegen
+
+Statt sie jedem Mitspieler zu schicken, trägst du sie einmal in `konfig.js`
+ein und pushst die Datei. Dann verbindet sich die App beim Start von selbst,
+das Eingabefeld im Profil verschwindet, und für deine Mitspieler sieht es so
+aus: Link antippen, Namen eingeben, tippen. Firebase bekommen sie nie zu
+Gesicht.
+
+In `konfig.js` darf der Block in JavaScript-Schreibweise stehen, also genau so,
+wie Firebase ihn anzeigt – die Anführungszeichen um die Schlüsselnamen sind nur
+im Eingabefeld der App nötig.
+
+Die Datei liegt damit im öffentlichen Repository. Das ist in Ordnung: Die
+Schlüssel identifizieren nur das Projekt, sie berechtigen zu nichts. Was
+jemand darf, entscheiden ausschließlich die Regeln oben. Wer den Beitrittscode
+nicht kennt, kommt in keine Gruppe.
 
 Ohne Verbindung funktioniert die App weiter, Gruppen bleiben dann aber leer:
 Du tippst allein auf deinem Gerät.
 
-## 4. Daten aktuell halten
+## 4. Konten und Gerätewechsel
+
+Beim ersten Öffnen meldet die App jeden anonym an. Das reicht zum Tippen und
+kostet niemanden einen Klick – hängt aber am Browserspeicher des Geräts.
+Cache geleert oder neues Handy heißt sonst: neue Kennung, und man steht als
+zweiter Spieler in der eigenen Gruppe.
+
+Deshalb gibt es unter **Profil → Konto** zwei Knöpfe:
+
+- **Konto mit Google sichern** hängt ein Google-Konto an die bestehende
+  Kennung. Die Teilnehmer-ID ändert sich dabei nicht, Tipps und Gruppen
+  bleiben unangetastet. Einmal drücken genügt.
+- **Schon gesichert? Anmelden** ist der Weg auf einem neuen Gerät. Nach der
+  Anmeldung holt die App Gruppen, Namen und Tipps zurück.
+
+Beim Zurückholen hat das Vorrang, was auf dem aktuellen Gerät schon getippt
+wurde – ein frisch abgegebener Tipp wird also nicht von einem älteren aus der
+Cloud überschrieben.
+
+Technisch liegt dafür unter `nutzer/{uid}` eine private Akte mit Gruppenliste
+und Tipps. Sie gehört ausschließlich dem jeweiligen Konto; die Regeln oben
+lassen niemand anderen heran. Die Ranglisten lesen weiterhin nur die Einträge
+unter `runden/{code}/teilnehmer`.
+
+Wer den Knopf nie drückt, merkt von alledem nichts und tippt anonym weiter.
+
+Zwei Hinweise für die Praxis: In installierten PWAs, vor allem auf iOS, lassen
+manche Browser kein Anmeldefenster zu. Die App weicht dann selbsttätig auf eine
+Weiterleitung aus – die Seite lädt einmal neu, danach ist man angemeldet.
+Und die Anmeldung klappt nur, wenn deine Pages-Adresse unter *Authentication →
+Settings → Authorized domains* eingetragen ist.
+
+## 5. Daten aktuell halten
 
 Die Action läuft täglich um 05:15 UTC und lässt sich unter *Actions →
 Spielplan und Ergebnisse aktualisieren → Run workflow* auch von Hand starten.
@@ -140,7 +193,7 @@ bei 14 Vereinen spielt jeder an jedem Spieltag. Bei einer Spielverlegung kann
 diese Zuordnung um einen Block verrutschen; die Tipps hängen an der Spiel-ID,
 nicht am Spieltag, es geht dabei also nichts verloren.
 
-## 5. Vereinslogos
+## 6. Vereinslogos
 
 Ausgeliefert wird die App mit Farbmarken: ein Kreis in den Vereinsfarben mit
 dem Kürzel. Die funktionieren offline, sind sofort unterscheidbar und berühren
@@ -167,7 +220,7 @@ Die Farben in `spielplan.json` sind ein Startwert und teils von mir geschätzt.
 Pro Verein zwei Werte: `farbe` (Fläche) und `farbe2` (der Ring darum).
 Bei hellen Flächen schaltet die Schrift automatisch auf dunkel.
 
-## 6. Wertung
+## 7. Wertung
 
 | Punkte | Bedingung |
 |---|---|
@@ -183,7 +236,7 @@ Penalty ist der Abstand immer genau ein Tor – auch das prüft die App.
 
 Andere Werte stehen in `app.js` ganz oben in `WERTUNG` und `punkteFuer()`.
 
-## 7. Tipps sind gesperrt
+## 8. Tipps sind gesperrt
 
 Ein Spiel lässt sich bis zum Anpfiff tippen, danach ist das Feld zu. Gibt der
 Spielplan keine Uhrzeit her, sperrt die App ab Mitternacht des Spieltags.

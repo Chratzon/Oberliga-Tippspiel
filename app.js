@@ -1,6 +1,7 @@
 /* Bully – Tippspiel Oberliga Süd 26/27 */
 
 import { Sync, GruppenFehler } from './sync.js';
+import { FIREBASE_KONFIG } from './konfig.js';
 
 /* ========== Wertung ========== */
 
@@ -44,6 +45,8 @@ const zustand = {
   gruppen: [],             // [{code, name, ersteller, offen}]
   profil: { name: '', gruppe: null, id: null },
   firebase: null,
+  festeKonfig: false,   // Verbindung kommt aus konfig.js
+  konto: { angemeldet: false, anonym: true, name: '', email: '' },
   spieltag: 1,
   ansicht: 'tippen',
   standDaten: null,
@@ -52,13 +55,14 @@ const zustand = {
 function laden() {
   try {
     const roh = localStorage.getItem(SCHLUESSEL);
-    if (!roh) return;
-    const d = JSON.parse(roh);
-    Object.assign(zustand.profil, d.profil || {});
-    zustand.tipps = d.tipps || {};
-    zustand.gruppen = d.gruppen || [];
-    zustand.eigeneKorrekturen = d.eigeneKorrekturen || {};
-    zustand.firebase = d.firebase || null;
+    if (roh) {
+      const d = JSON.parse(roh);
+      Object.assign(zustand.profil, d.profil || {});
+      zustand.tipps = d.tipps || {};
+      zustand.gruppen = d.gruppen || [];
+      zustand.eigeneKorrekturen = d.eigeneKorrekturen || {};
+      zustand.firebase = d.firebase || null;
+    }
   } catch (e) {
     console.warn('Gespeicherte Daten unlesbar, starte leer.', e);
   }
@@ -71,6 +75,12 @@ function laden() {
     zustand.profil.gruppe = code;
   }
   delete zustand.profil.runde;
+
+  // Liegt eine feste Konfiguration bei, gilt die – nicht die gespeicherte.
+  if (FIREBASE_KONFIG && FIREBASE_KONFIG.projectId) {
+    zustand.firebase = FIREBASE_KONFIG;
+    zustand.festeKonfig = true;
+  }
 }
 
 function sichern() {
@@ -79,7 +89,7 @@ function sichern() {
     tipps: zustand.tipps,
     gruppen: zustand.gruppen,
     eigeneKorrekturen: zustand.eigeneKorrekturen,
-    firebase: zustand.firebase,
+    firebase: zustand.festeKonfig ? null : zustand.firebase,
   }));
 }
 
@@ -466,11 +476,80 @@ async function einladen(g) {
   }
 }
 
+function zeichneKonto() {
+  const k = zustand.konto;
+  const status = $('#konto-status');
+  const knoepfe = $('#konto-knoepfe');
+  knoepfe.innerHTML = '';
+
+  if (!Sync.verbunden()) {
+    $('#block-konto').hidden = true;
+    return;
+  }
+  $('#block-konto').hidden = false;
+
+  if (!k.anonym) {
+    status.textContent = `Gesichert über Google${k.email ? ' (' + k.email + ')' : ''}. `
+      + 'Auf einem neuen Gerät meldest du dich damit an und hast Gruppen und Tipps sofort wieder.';
+    knoepfe.innerHTML = '<button type="button" class="knopf knopf-still" data-tat="abmelden">Auf diesem Gerät abmelden</button>';
+  } else {
+    status.textContent = 'Dein Profil hängt an diesem Gerät. Wird der Browserspeicher geleert '
+      + 'oder wechselst du das Handy, fängst du als neuer Mitspieler an. '
+      + 'Ein Google-Konto anzuhängen behebt das – deine Tipps und Gruppen bleiben dabei erhalten.';
+    knoepfe.innerHTML =
+      '<button type="button" class="knopf" data-tat="sichern">Konto mit Google sichern</button>'
+      + '<button type="button" class="knopf knopf-still" data-tat="anmelden">Schon gesichert? Anmelden</button>';
+  }
+
+  knoepfe.onclick = async (e) => {
+    const tat = e.target.closest('[data-tat]')?.dataset.tat;
+    if (!tat) return;
+
+    try {
+      if (tat === 'sichern') {
+        const k2 = await Sync.googleVerknuepfen();
+        if (!k2) return;            // Weiterleitung läuft, Seite lädt neu
+        sichern();
+        toast('Konto gesichert');
+      }
+
+      if (tat === 'anmelden') {
+        const gefunden = await Sync.googleAnmelden();
+        if (gefunden === null) return;
+        sichern();
+        kopfAktualisieren();
+        toast(gefunden
+          ? `Willkommen zurück: ${gefunden.gruppen} Gruppen, ${gefunden.tipps} Tipps`
+          : 'Angemeldet. Zu diesem Konto war noch nichts gespeichert.');
+      }
+
+      if (tat === 'abmelden') {
+        if (!confirm('Abmelden? Auf diesem Gerät startest du danach als neuer Mitspieler, bis du dich wieder anmeldest.')) return;
+        await Sync.googleAbmelden();
+        sichern();
+        kopfAktualisieren();
+        toast('Abgemeldet');
+      }
+    } catch (err) {
+      toast(err.message);
+    }
+    zeichneProfil();
+  };
+}
+
 function zeichneProfil() {
   $('#in-name').value = zustand.profil.name;
-  $('#in-firebase').value = zustand.firebase ? JSON.stringify(zustand.firebase, null, 2) : '';
-  $('#fb-status').textContent = Sync.statusText();
+  zeichneKonto();
   zeichneGruppen();
+
+  // Ist die Verbindung fest hinterlegt, braucht niemand das Eingabefeld.
+  $('#block-verbindung').hidden = zustand.festeKonfig;
+  $('#feste-verbindung').hidden = !zustand.festeKonfig;
+  $('#feste-verbindung').textContent = Sync.statusText();
+  if (!zustand.festeKonfig) {
+    $('#in-firebase').value = zustand.firebase ? JSON.stringify(zustand.firebase, null, 2) : '';
+    $('#fb-status').textContent = Sync.statusText();
+  }
   $('#daten-stand').textContent = zustand.standDaten
     ? `Spielplan und Ergebnisse vom ${new Date(zustand.standDaten).toLocaleDateString('de-DE')}`
     : 'Spielplan aus der mitgelieferten Datei';
@@ -715,7 +794,7 @@ async function start() {
     beiAenderung: () => {
       kopfAktualisieren();
       if (zustand.ansicht === 'tabelle') zeichneRangliste();
-      if (zustand.ansicht === 'profil') zeichneGruppen();
+      if (zustand.ansicht === 'profil') zeichneProfil();
     },
     beiStatus: syncBand,
   });

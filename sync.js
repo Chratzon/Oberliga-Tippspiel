@@ -7,6 +7,8 @@ const CDN = 'https://www.gstatic.com/firebasejs/10.12.2';
 let ctx = null;          // { zustand, beiAenderung, beiStatus }
 let db = null;
 let fs = null;
+let authM = null;        // Auth-Modul
+let authObj = null;      // Auth-Instanz
 let abmelden = [];       // aktive Listener
 let status = 'aus';      // aus | verbinde | verbunden | fehler
 let fehlerText = '';
@@ -20,6 +22,20 @@ function codeErzeugen() {
 }
 
 class GruppenFehler extends Error {}
+
+/* Manche Browser und installierte PWAs lassen kein Anmeldefenster zu.
+   Dann weicht die App auf die Weiterleitung aus. */
+function istPopupProblem(e) {
+  return [
+    'auth/popup-blocked',
+    'auth/operation-not-supported-in-this-environment',
+  ].includes(e?.code);
+}
+
+/* Vom Nutzer selbst abgebrochen – kein Fehler, nur nichts passiert. */
+function istAbbruch(e) {
+  return ['auth/popup-closed-by-user', 'auth/cancelled-popup-request'].includes(e?.code);
+}
 
 export const Sync = {
 
@@ -62,12 +78,20 @@ export const Sync = {
       getApps().forEach((a) => deleteApp(a).catch(() => {}));
       const app = initializeApp(cfg);
 
-      const a = auth.getAuth(app);
-      await auth.signInAnonymously(a);
-      ctx.zustand.profil.id = a.currentUser.uid;
-
+      authM = auth;
+      authObj = auth.getAuth(app);
       db = fs.getFirestore(app);
+
+      // Kehrt der Nutzer von einer Google-Weiterleitung zurück, ist er hier
+      // schon angemeldet – dann keine neue anonyme Kennung erzeugen.
+      const rueckkehr = await auth.getRedirectResult(authObj).catch(() => null);
+      if (!authObj.currentUser) await auth.signInAnonymously(authObj);
+
+      ctx.zustand.profil.id = authObj.currentUser.uid;
+      ctx.zustand.konto = this.kontoInfo();
       status = 'verbunden';
+
+      if (rueckkehr && rueckkehr.user) await this.wiederherstellen();
 
       await this.mitgliedschaftenSchreiben();
       this.zuhoeren();
@@ -85,6 +109,111 @@ export const Sync = {
     abmelden = [];
     db = null;
     status = 'aus';
+  },
+
+  /* ---------- Konto ---------- */
+
+  kontoInfo() {
+    const u = authObj?.currentUser;
+    if (!u) return { angemeldet: false, anonym: true, name: '', email: '' };
+    return {
+      angemeldet: true,
+      anonym: u.isAnonymous,
+      name: u.displayName || '',
+      email: u.email || '',
+    };
+  },
+
+  /* Hängt ein Google-Konto an die bestehende anonyme Kennung.
+     Die Teilnehmer-ID bleibt dieselbe, Tipps und Gruppen bleiben, wo sie sind. */
+  async googleVerknuepfen() {
+    if (!authObj || status !== 'verbunden') throw new GruppenFehler('Dafür braucht es eine Verbindung.');
+    const anbieter = new authM.GoogleAuthProvider();
+
+    try {
+      await authM.linkWithPopup(authObj.currentUser, anbieter);
+    } catch (e) {
+      if (istAbbruch(e)) throw new GruppenFehler('Abgebrochen.');
+      if (istPopupProblem(e)) {
+        await authM.linkWithRedirect(authObj.currentUser, anbieter);
+        return null;   // die Seite lädt neu
+      }
+      if (e.code === 'auth/credential-already-in-use') {
+        throw new GruppenFehler('Dieses Google-Konto gehört schon zu einem anderen Profil. Nimm stattdessen „Mit Google anmelden“.');
+      }
+      if (e.code === 'auth/email-already-in-use') {
+        throw new GruppenFehler('Zu dieser Adresse gibt es schon ein Profil. Nimm „Mit Google anmelden“.');
+      }
+      throw new GruppenFehler(e.message);
+    }
+
+    ctx.zustand.konto = this.kontoInfo();
+    await this.nutzerAkteSchreiben();
+    return ctx.zustand.konto;
+  },
+
+  /* Auf einem neuen Gerät: anmelden und den eigenen Stand zurückholen. */
+  async googleAnmelden() {
+    if (!authObj || status !== 'verbunden') throw new GruppenFehler('Dafür braucht es eine Verbindung.');
+    const anbieter = new authM.GoogleAuthProvider();
+
+    try {
+      await authM.signInWithPopup(authObj, anbieter);
+    } catch (e) {
+      if (istAbbruch(e)) throw new GruppenFehler('Abgebrochen.');
+      if (istPopupProblem(e)) {
+        await authM.signInWithRedirect(authObj, anbieter);
+        return null;
+      }
+      throw new GruppenFehler(e.message);
+    }
+
+    ctx.zustand.profil.id = authObj.currentUser.uid;
+    ctx.zustand.konto = this.kontoInfo();
+    const gefunden = await this.wiederherstellen();
+    await this.mitgliedschaftenSchreiben();
+    this.zuhoeren();
+    return gefunden;
+  },
+
+  async googleAbmelden() {
+    if (!authObj) return;
+    await authM.signOut(authObj);
+    ctx.zustand.konto = { angemeldet: false, anonym: true, name: '', email: '' };
+    this.trennen();
+    await this.neuVerbinden();
+  },
+
+  /* Eigene Akte: privat, nur für das Zurückholen auf einem neuen Gerät. */
+  async nutzerAkteSchreiben() {
+    if (!db || status !== 'verbunden') return;
+    const { profil, tipps, gruppen } = ctx.zustand;
+    await fs.setDoc(fs.doc(db, 'nutzer', profil.id), {
+      name: profil.name || '',
+      gruppen,
+      tipps,
+      aktualisiert: new Date().toISOString(),
+    }).catch((e) => console.warn('Nutzerakte: ' + e.message));
+  },
+
+  /* Beim Anmelden auf einem neuen Gerät: Gruppen, Name und Tipps zurückholen.
+     Was auf diesem Gerät schon getippt wurde, hat Vorrang. */
+  async wiederherstellen() {
+    if (!db) return null;
+    const schnappschuss = await fs.getDoc(fs.doc(db, 'nutzer', ctx.zustand.profil.id)).catch(() => null);
+    if (!schnappschuss || !schnappschuss.exists()) return null;
+
+    const d = schnappschuss.data();
+    ctx.zustand.tipps = { ...(d.tipps || {}), ...ctx.zustand.tipps };
+
+    const vorhanden = new Set(ctx.zustand.gruppen.map((g) => g.code));
+    for (const g of (d.gruppen || [])) {
+      if (!vorhanden.has(g.code)) ctx.zustand.gruppen.push(g);
+    }
+    if (!ctx.zustand.profil.name && d.name) ctx.zustand.profil.name = d.name;
+    if (!ctx.zustand.profil.gruppe) ctx.zustand.profil.gruppe = ctx.zustand.gruppen[0]?.code || null;
+
+    return { gruppen: (d.gruppen || []).length, tipps: Object.keys(d.tipps || {}).length };
   },
 
   /* ---------- Gruppen ---------- */
@@ -187,6 +316,7 @@ export const Sync = {
         aktualisiert: new Date().toISOString(),
       }).catch((e) => console.warn(`Gruppe ${g.code}: ${e.message}`))
     ));
+    await this.nutzerAkteSchreiben();
   },
 
   zuhoeren() {
