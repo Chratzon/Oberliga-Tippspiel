@@ -4,7 +4,7 @@
  *   node scripts/test-parser.mjs
  */
 
-import { bloeckeZerlegen, ergebnisAus, zeitAus, anpfiffMs } from './scrape.mjs';
+import { bloeckeZerlegen, ergebnisAus, zeitAus, anpfiffMs, faelligeTage } from './scrape.mjs';
 
 // [slug, zeit, endstand, drittel1, drittel2, drittel3, zusatz, erwartet]
 const SPIELE = [
@@ -77,6 +77,26 @@ pruefe(new Date(anpfiffMs('2026-09-18', '19:30')).toISOString() === '2026-09-18T
   'Sommerzeit: 18.09. 19:30 → 17:30 UTC');
 pruefe(new Date(anpfiffMs('2026-11-20', '19:30')).toISOString() === '2026-11-20T18:30:00.000Z',
   'Winterzeit: 20.11. 19:30 → 18:30 UTC');
+
+console.log('\nWann wird abgefragt? (Sonntag 20.09.: Spiele 15:00 bis 18:00)');
+{
+  const sonntag = [
+    { id: 'a', datum: '2026-09-20', zeit: '15:00' },
+    { id: 'b', datum: '2026-09-20', zeit: '17:30' },
+    { id: 'c', datum: '2026-09-20', zeit: '18:00' },
+  ];
+  const um = (hhmm, tag = '2026-09-20') => anpfiffMs(tag, hhmm);
+  const faellig = (zeit, erg = {}, tag) => faelligeTage(sonntag, erg, um(zeit, tag)).length > 0;
+
+  pruefe(!faellig('17:45'), '17:45 – erstes Spiel vorbei, andere laufen: kein Abruf');
+  pruefe(!faellig('20:30'), '20:30 – letztes Spiel erst 2½ Std. alt: kein Abruf');
+  pruefe(faellig('20:45'), '20:45 – letztes Spiel 2 Std. 45 Min. alt: Abruf');
+  pruefe(faellig('21:15', { a: {}, b: {} }), '21:15 – ein Ergebnis fehlt noch: erneuter Abruf');
+  pruefe(!faellig('21:15', { a: {}, b: {}, c: {} }), '21:15 – alle Ergebnisse da: kein Abruf');
+  pruefe(faellig('01:30', {}, '2026-09-21'), 'Montag 01:30 – Nachzügler noch offen: Abruf');
+  pruefe(!faellig('23:00', {}, '2026-09-21'), 'Montag 23:00 – über 30 Std. her: aufgeben, Nachtlauf übernimmt');
+  pruefe(!faelligeTage([], {}, Date.now()).length, 'Tag ohne Spiele: kein Abruf');
+}
 
 console.log(fehler ? `\n${fehler} Fehler.` : '\nAlles bestanden.');
 process.exitCode = fehler ? 1 : 0;

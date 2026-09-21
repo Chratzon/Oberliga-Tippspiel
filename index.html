@@ -87,9 +87,15 @@
 
   <!-- ===== Ergebnisse ===== -->
   <section id="view-ergebnisse" class="view" hidden>
-    <div class="rang-kopf">
-      <h2>Ergebnisse</h2>
-      <p id="erg-info" class="rang-info"></p>
+    <div class="rang-kopf kopf-mit-knopf">
+      <div>
+        <h2>Ergebnisse</h2>
+        <p id="erg-info" class="rang-info"></p>
+      </div>
+      <button id="btn-aktualisieren" type="button" class="knopf-aktualisieren">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v4.5h-4.5"/></svg>
+        <span>Aktualisieren</span>
+      </button>
     </div>
     <div id="ergebnis-liste" class="spiele-liste"></div>
     <p id="erg-leer" class="leer" hidden>Noch keine Endstände vorhanden.</p>

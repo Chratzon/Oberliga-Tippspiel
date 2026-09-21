@@ -532,3 +532,26 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.
   font-size: 1.3rem; line-height: 1; border-radius: 6px;
 }
 .banner-zu:hover { color: #EAF2F7; }
+
+/* ---------- Aktualisieren ---------- */
+
+.kopf-mit-knopf {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+}
+
+.knopf-aktualisieren {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 13px; margin-top: 2px;
+  border-radius: 999px; border: 1px solid var(--grau-hell);
+  background: var(--eis-hell); color: var(--puck);
+  font-size: 0.8rem; font-weight: 600;
+}
+.knopf-aktualisieren svg {
+  width: 16px; height: 16px; fill: none;
+  stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.knopf-aktualisieren:disabled { opacity: 0.6; cursor: default; }
+.knopf-aktualisieren.ist-laedt svg { animation: drehen 0.9s linear infinite; }
+
+@keyframes drehen { to { transform: rotate(360deg); } }

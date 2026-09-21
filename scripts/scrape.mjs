@@ -26,6 +26,8 @@ const TEAMS_PRO_SPIELTAG = 7;
 const PAUSE_MS = 900;
 const DATENFORMAT = 2;                       // ältere Ergebnisdateien werden verworfen
 const FRUEHESTES_ENDE_MS = 135 * 60 * 1000;  // vorher gilt kein Spiel als beendet
+const SPIELTAG_FERTIG_MS = 160 * 60 * 1000;  // so lange nach dem letzten Anpfiff wird abgefragt
+const NACHLAUF_MS = 30 * 60 * 60 * 1000;     // offene Spiele so lange nachfragen
 
 const SLUG_ZU_TEAM = {
   deggendorf: 'deggendorf', peiting: 'peiting', passau: 'passau',
@@ -112,6 +114,26 @@ export function anpfiffMs(datum, zeit) {
   return naiv - (alsBerlin - naiv);
 }
 
+/* Welche Spieltage sind fertig, haben aber noch Lücken bei den Ergebnissen?
+   Ein Tag gilt als fertig, wenn sein letztes Spiel seit 2 Std. 40 Min. läuft.
+   Nur dann lohnt ein Abruf – vorher kämen die Ergebnisse unvollständig. */
+export function faelligeTage(spiele, ergebnisse, jetzt = Date.now()) {
+  const tage = new Map();
+  for (const s of spiele) {
+    const t = anpfiffMs(s.datum, s.zeit);
+    const tag = tage.get(s.datum) || { letzter: 0, offen: 0, erster: Infinity };
+    tag.letzter = Math.max(tag.letzter, t);
+    tag.erster = Math.min(tag.erster, t);
+    if (!ergebnisse[s.id]) tag.offen++;
+    tage.set(s.datum, tag);
+  }
+  return [...tage.entries()]
+    .filter(([, t]) => t.offen > 0
+      && jetzt >= t.letzter + SPIELTAG_FERTIG_MS
+      && jetzt <= t.erster + NACHLAUF_MS)
+    .map(([datum, t]) => ({ datum, offen: t.offen }));
+}
+
 function datumIso(roh) {
   return `${roh.slice(0, 4)}-${roh.slice(4, 6)}-${roh.slice(6, 8)}`;
 }
@@ -155,8 +177,70 @@ async function jsonLesen(pfad, ersatz) {
 
 /* ---------- Hauptablauf ---------- */
 
-async function main() {
-  const pruefen = process.argv.includes('--pruefen');
+function ergebnisseAuswerten(ergBloecke, alle, jetzt) {
+  const gefunden = {};
+  let abgelehnt = 0;
+  for (const b of ergBloecke) {
+    const spiel = alle.get(b.id);
+    if (!spiel) continue;
+    if (jetzt < anpfiffMs(spiel.datum, spiel.zeit) + FRUEHESTES_ENDE_MS) continue;
+    const e = ergebnisAus(b.text);
+    if (e) gefunden[b.id] = e;
+    else abgelehnt++;
+  }
+  return { gefunden, abgelehnt };
+}
+
+async function ergebnisseSchreiben(ergebnisse) {
+  await writeFile(new URL('../data/ergebnisse.json', import.meta.url), JSON.stringify({
+    format: DATENFORMAT,
+    aktualisiert: new Date().toISOString(),
+    quelle: 'hockeyweb.de',
+    ergebnisse,
+  }, null, 2) + '\n');
+}
+
+async function alteErgebnisseLesen() {
+  const datei = await jsonLesen('../data/ergebnisse.json', {});
+  if (datei.format === DATENFORMAT) return datei.ergebnisse || {};
+  if (Object.keys(datei.ergebnisse || {}).length) {
+    console.log('Alte Ergebnisdatei ohne Gegenprobe erkannt – wird neu aufgebaut.');
+  }
+  return {};
+}
+
+/* Tagsüber: nur die Ergebnisseite, und nur wenn ein Spieltag fertig ist. */
+async function spieltagModus() {
+  const plan = await jsonLesen('../data/spielplan.json', { spiele: [] });
+  const alte = await alteErgebnisseLesen();
+  const jetzt = Date.now();
+
+  const faellig = faelligeTage(plan.spiele || [], alte, jetzt);
+  if (!faellig.length) {
+    console.log('Kein abgeschlossener Spieltag mit offenen Ergebnissen – kein Abruf.');
+    return;
+  }
+  console.log('Fällig: ' + faellig.map((t) => `${t.datum} (${t.offen} offen)`).join(', '));
+
+  const ergBloecke = await alleBloecke('ergebnisse');
+  const alle = new Map((plan.spiele || []).map((sp) => [sp.id, sp]));
+  const { gefunden, abgelehnt } = ergebnisseAuswerten(ergBloecke, alle, jetzt);
+
+  const ergebnisse = { ...alte, ...gefunden };
+  const neu = Object.keys(gefunden).filter((id) => !alte[id]).length;
+  console.log(`${neu} neue Endstände, ${abgelehnt} ohne gültigen Endstand.`);
+
+  const nochOffen = faelligeTage(plan.spiele || [], ergebnisse, jetzt);
+  if (nochOffen.length) {
+    console.log('Noch offen, nächster Lauf versucht es erneut: '
+      + nochOffen.map((t) => `${t.datum} (${t.offen})`).join(', '));
+  }
+
+  if (neu > 0 || Object.keys(alte).length === 0) await ergebnisseSchreiben(ergebnisse);
+}
+
+/* Nachts oder von Hand: kompletter Spielplan plus Ergebnisse. */
+async function vollModus(pruefen) {
   const warnungen = new Set();
   const team = (slug) => {
     if (!SLUG_ZU_TEAM[slug]) warnungen.add(slug);
@@ -187,60 +271,36 @@ async function main() {
     return;
   }
 
-  /* Spielplan zusammenführen: Die Quelle zeigt vergangene Wochen nicht
-     dauerhaft an. Was einmal bekannt war, bleibt erhalten – außer es gibt
-     für dieselbe Paarung am selben Tag inzwischen eine andere Kennung. */
+  // Bekannte Spiele behalten; doppelte Paarungen mit alter Kennung verwerfen.
   const plan = await jsonLesen('../data/spielplan.json', { teams: [], spiele: [] });
-  const paarung = (s) => `${s.datum}|${s.heim}|${s.gast}`;
+  const paarung = (sp) => `${sp.datum}|${sp.heim}|${sp.gast}`;
   const bekanntePaarungen = new Set([...gefunden.values()].map(paarung));
 
   const alle = new Map();
-  for (const s of plan.spiele || []) {
-    if (!gefunden.has(s.id) && bekanntePaarungen.has(paarung(s))) continue;
-    alle.set(s.id, s);
+  for (const sp of plan.spiele || []) {
+    if (!gefunden.has(sp.id) && bekanntePaarungen.has(paarung(sp))) continue;
+    alle.set(sp.id, sp);
   }
-  for (const s of gefunden.values()) {
-    const alt = alle.get(s.id);
-    alle.set(s.id, { ...alt, ...s, zeit: s.zeit || alt?.zeit || null });
+  for (const sp of gefunden.values()) {
+    const alt = alle.get(sp.id);
+    alle.set(sp.id, { ...alt, ...sp, zeit: sp.zeit || alt?.zeit || null });
   }
 
   const sortiert = [...alle.values()].sort((a, b) =>
     (a.datum + (a.zeit || '00:00')).localeCompare(b.datum + (b.zeit || '00:00')));
-  sortiert.forEach((s, i) => { s.spieltag = Math.floor(i / TEAMS_PRO_SPIELTAG) + 1; });
+  sortiert.forEach((sp, i) => { sp.spieltag = Math.floor(i / TEAMS_PRO_SPIELTAG) + 1; });
 
-  /* Ergebnisse: nur mit bestandener Gegenprobe und nur für Spiele,
-     die frühestens vor 2 Stunden 15 Minuten angepfiffen wurden. */
-  const jetzt = Date.now();
-  const neueErgebnisse = {};
-  let abgelehnt = 0;
-
-  for (const b of ergBloecke) {
-    const spiel = alle.get(b.id);
-    if (!spiel) continue;
-    const anpfiff = anpfiffMs(spiel.datum, spiel.zeit);
-    if (jetzt < anpfiff + FRUEHESTES_ENDE_MS) continue;
-
-    const e = ergebnisAus(b.text);
-    if (e) neueErgebnisse[b.id] = e;
-    else abgelehnt++;
-  }
-
-  // Frühere Endstände behalten – aber nur aus Dateien im geprüften Format.
-  const alteDatei = await jsonLesen('../data/ergebnisse.json', {});
-  const alteErgebnisse = alteDatei.format === DATENFORMAT ? (alteDatei.ergebnisse || {}) : {};
-  if (alteDatei.format !== DATENFORMAT && Object.keys(alteDatei.ergebnisse || {}).length) {
-    console.log('Alte Ergebnisdatei ohne Gegenprobe erkannt – wird komplett neu aufgebaut.');
-  }
-  const ergebnisse = { ...alteErgebnisse, ...neueErgebnisse };
+  const { gefunden: neueErgebnisse, abgelehnt } = ergebnisseAuswerten(ergBloecke, alle, Date.now());
+  const ergebnisse = { ...(await alteErgebnisseLesen()), ...neueErgebnisse };
 
   console.log(`\n${gefunden.size} Partien gelesen, ${sortiert.length} im Spielplan.`);
-  console.log(`${Object.keys(neueErgebnisse).length} Endstände erkannt, ${abgelehnt} ohne gültigen Endstand übersprungen.`);
+  console.log(`${Object.keys(neueErgebnisse).length} Endstände erkannt, ${abgelehnt} ohne gültigen Endstand.`);
   if (warnungen.size) console.warn('Unbekannte Team-Slugs: ' + [...warnungen].join(', '));
 
   if (pruefen) {
     for (const [id, e] of Object.entries(neueErgebnisse)) {
-      const s = alle.get(id);
-      console.log(`  ${s.datum} ${s.heim} – ${s.gast}: ${e.h}:${e.a} ${e.art === 'REG' ? '' : e.art}`);
+      const sp = alle.get(id);
+      console.log(`  ${sp.datum} ${sp.heim} – ${sp.gast}: ${e.h}:${e.a} ${e.art === 'REG' ? '' : e.art}`);
     }
     return;
   }
@@ -249,15 +309,14 @@ async function main() {
   plan.standGeneriert = new Date().toISOString().slice(0, 10);
   plan.quelle = 'hockeyweb.de';
   await writeFile(new URL('../data/spielplan.json', import.meta.url), JSON.stringify(plan, null, 2) + '\n');
-
-  await writeFile(new URL('../data/ergebnisse.json', import.meta.url), JSON.stringify({
-    format: DATENFORMAT,
-    aktualisiert: new Date().toISOString(),
-    quelle: 'hockeyweb.de',
-    ergebnisse,
-  }, null, 2) + '\n');
-
+  await ergebnisseSchreiben(ergebnisse);
   console.log('data/spielplan.json und data/ergebnisse.json geschrieben.');
+}
+
+async function main() {
+  const pruefen = process.argv.includes('--pruefen');
+  if (process.argv.includes('--modus=spieltag')) await spieltagModus();
+  else await vollModus(pruefen);
 }
 
 // Nur ausführen, wenn direkt aufgerufen – nicht beim Import durch die Tests.

@@ -13,7 +13,7 @@ export const WERTUNG = [
   { punkte: 1, text: 'Nur der Sieger stimmt' },
 ];
 
-export const AUSGANG = { REG: '60 Min.', OT: 'Verl.', PS: 'Penalty' };
+export const AUSGANG = { REG: '60 Min.', OT: 'OT', PS: 'Penalty' };
 
 export function punkteFuer(tipp, erg) {
   if (!tipp || !erg) return null;
@@ -368,7 +368,7 @@ function zeichneErgebnisse() {
     .sort((a, b) => (b.datum + (b.zeit || '')).localeCompare(a.datum + (a.zeit || '')));
 
   $('#erg-info').textContent = zustand.standDaten
-    ? `Zuletzt aktualisiert: ${new Date(zustand.standDaten).toLocaleString('de-DE')}`
+    ? `Daten abgeholt ${vorWieLangem(zustand.standDaten)}`
     : 'Noch keine Aktualisierung durchgelaufen';
 
   const liste = $('#ergebnis-liste');
@@ -724,38 +724,93 @@ const AUGE_AUF = `<svg viewBox="0 0 24 24" aria-hidden="true">
 
 /* ========== Laufende Aktualisierung ========== */
 
-const NACHSPIELZEIT_MS = 3 * 60 * 60 * 1000;   // bis 3 Stunden nach Anpfiff
+const NACHSPIELZEIT_MS = 4 * 60 * 60 * 1000;   // bis 4 Stunden nach dem letzten Anpfiff des Tages
 const TAKT_MS = 10 * 60 * 1000;                // alle 10 Minuten nachsehen
 
 let letzterAbruf = 0;
 let gesperrtStand = '';
 
-/* Läuft gerade mindestens eine Partie – oder liegt ihr Anpfiff
-   weniger als drei Stunden zurück? */
+/* Ist heute Spieltag und fehlen noch Ergebnisse? Die Endstände kommen
+   gesammelt, sobald das letzte Spiel des Tages vorbei ist – deshalb zählt
+   der Tag als Ganzes: vom ersten Anpfiff bis 4 Std. nach dem letzten. */
 function spieleLaufen() {
   const jetzt = Date.now();
-  return zustand.spielplan.spiele.some((s) => {
-    const start = anpfiff(s).getTime();
-    return jetzt >= start && jetzt <= start + NACHSPIELZEIT_MS && !ergebnisVon(s.id);
-  });
+  const tage = new Map();
+  for (const s of zustand.spielplan.spiele) {
+    const t = anpfiff(s).getTime();
+    const tag = tage.get(s.datum) || { erster: t, letzter: t, offen: false };
+    tag.erster = Math.min(tag.erster, t);
+    tag.letzter = Math.max(tag.letzter, t);
+    if (!ergebnisVon(s.id)) tag.offen = true;
+    tage.set(s.datum, tag);
+  }
+  return [...tage.values()].some((t) =>
+    t.offen && jetzt >= t.erster && jetzt <= t.letzter + NACHSPIELZEIT_MS);
+}
+
+/* Holt Spielplan und Ergebnisse frisch vom Server und gibt zurück,
+   wie viele Endstände neu dazugekommen sind. */
+async function spieldatenErneuern() {
+  const frisch = (pfad) => fetch(`${pfad}?t=${Date.now()}`, { cache: 'no-store' })
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+
+  const [plan, erg] = await Promise.all([frisch('data/spielplan.json'), frisch('data/ergebnisse.json')]);
+
+  const vorher = new Set(Object.keys(zustand.ergebnisse));
+  zustand.spielplan = plan;
+  zustand.teams = new Map(plan.teams.map((t) => [t.id, t]));
+  zustand.ergebnisse = erg.ergebnisse || {};
+  zustand.standDaten = erg.aktualisiert || null;
+  letzterAbruf = Date.now();
+
+  const neu = Object.keys(zustand.ergebnisse).filter((id) => !vorher.has(id)).length;
+  neuZeichnen();
+  return neu;
+}
+
+/* Zeichnet die aktuelle Ansicht neu, ohne die Scrollposition zu verlieren. */
+function neuZeichnen() {
+  if (zustand.ansicht === 'tippen') zeichneTippen();
+  if (zustand.ansicht === 'tabelle') zeichneRangliste();
+  if (zustand.ansicht === 'ergebnisse') zeichneErgebnisse();
 }
 
 async function ergebnisseErneuern() {
   try {
-    const antwort = await fetch('data/ergebnisse.json?t=' + Date.now(), { cache: 'no-store' });
-    const erg = await antwort.json();
-    const vorher = JSON.stringify(zustand.ergebnisse);
-    zustand.ergebnisse = erg.ergebnisse || {};
-    zustand.standDaten = erg.aktualisiert || null;
-    letzterAbruf = Date.now();
-
-    if (JSON.stringify(zustand.ergebnisse) !== vorher) {
-      zeige(zustand.ansicht);
-      toast('Ergebnisse aktualisiert');
-    }
+    const neu = await spieldatenErneuern();
+    if (neu) toast(neu === 1 ? '1 neuer Endstand' : `${neu} neue Endstände`);
   } catch {
     // Kein Netz: beim nächsten Durchlauf erneut versuchen.
   }
+}
+
+function vorWieLangem(iso) {
+  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 1) return 'gerade eben';
+  if (min < 60) return `vor ${min} Min.`;
+  const std = Math.round(min / 60);
+  if (std < 24) return `vor ${std} Std.`;
+  return 'am ' + new Date(iso).toLocaleDateString('de-DE');
+}
+
+function aktualisierenAnbinden() {
+  const knopf = $('#btn-aktualisieren');
+  knopf.addEventListener('click', async () => {
+    if (knopf.disabled) return;
+    knopf.disabled = true;
+    knopf.classList.add('ist-laedt');
+    try {
+      const neu = await spieldatenErneuern();
+      toast(neu
+        ? (neu === 1 ? '1 neuer Endstand' : `${neu} neue Endstände`)
+        : `Keine neuen Ergebnisse · Daten ${vorWieLangem(zustand.standDaten || new Date())}`);
+    } catch {
+      toast('Keine Verbindung – bitte später nochmal');
+    } finally {
+      // Kurze Sperre, damit niemand den Server im Sekundentakt anklopft
+      setTimeout(() => { knopf.disabled = false; knopf.classList.remove('ist-laedt'); }, 3000);
+    }
+  });
 }
 
 /* Ein Takt für beides: Tipps sperren, sobald ein Spiel beginnt,
@@ -948,6 +1003,7 @@ async function start() {
   raumFormulareAnbinden();
   passwortFelderAufwerten();
   installationAnbinden();
+  aktualisierenAnbinden();
 
   $('#btn-export').addEventListener('click', () => {
     const blob = new Blob([JSON.stringify({ profil: zustand.profil, tipps: zustand.tipps }, null, 2)],

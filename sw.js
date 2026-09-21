@@ -1,6 +1,6 @@
 /* Service Worker – App-Shell aus dem Cache, Daten bevorzugt aus dem Netz. */
 
-const CACHE = 'bully-v11';
+const CACHE = 'bully-v14';
 
 const SHELL = [
   './',
