@@ -3,11 +3,11 @@ name: Spielplan und Ergebnisse aktualisieren
 # In Anführungszeichen, sonst liest YAML "on" als Wahrheitswert.
 "on":
   schedule:
-    # Spielzeit: alle 10 Minuten zwischen 13:00 und 22:50 UTC.
-    # Deckt Anpfiff 15:00 bis Spielende gegen Mitternacht deutscher Zeit ab.
-    - cron: '*/10 13-22 * * *'
-    # Einmal nachts als Sicherheitsnetz und für Spielplanänderungen
-    - cron: '15 5 * * *'
+    # Spieltag: prüft nur die eigene Datei. hockeyweb wird erst gefragt,
+    # wenn das letzte Spiel eines Tages seit 2 Std. 40 Min. läuft.
+    - cron: '*/15 15-23 * * *'
+    # Nachts: kompletter Spielplan (Verlegungen) und Nachzügler.
+    - cron: '15 3 * * *'
   workflow_dispatch:
 
 permissions:
@@ -27,7 +27,12 @@ jobs:
         run: node scripts/test-parser.mjs
 
       - name: Daten holen
-        run: node scripts/scrape.mjs
+        run: |
+          if [ "${{ github.event.schedule }}" = "*/15 15-23 * * *" ]; then
+            node scripts/scrape.mjs --modus=spieltag
+          else
+            node scripts/scrape.mjs
+          fi
 
       - name: Änderungen einchecken
         run: |
