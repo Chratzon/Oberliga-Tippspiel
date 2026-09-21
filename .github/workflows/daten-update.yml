@@ -1,8 +1,12 @@
 name: Spielplan und Ergebnisse aktualisieren
 
+# In Anführungszeichen, sonst liest YAML "on" als Wahrheitswert.
 "on":
   schedule:
+    # Spielzeit: alle 10 Minuten zwischen 13:00 und 22:50 UTC.
+    # Deckt Anpfiff 15:00 bis Spielende gegen Mitternacht deutscher Zeit ab.
     - cron: '*/10 13-22 * * *'
+    # Einmal nachts als Sicherheitsnetz und für Spielplanänderungen
     - cron: '15 5 * * *'
   workflow_dispatch:
 
@@ -14,11 +18,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: Erkennung prüfen
+        run: node scripts/test-parser.mjs
+
       - name: Daten holen
         run: node scripts/scrape.mjs
+
       - name: Änderungen einchecken
         run: |
           git config user.name  "github-actions[bot]"
