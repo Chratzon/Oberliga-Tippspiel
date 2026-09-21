@@ -1,46 +1,6 @@
 {
-  "aktualisiert": "2026-09-21T20:49:38.248Z",
-  "quelle": "hockeyweb.de",
-  "ergebnisse": {
-    "17418": {
-      "h": 18,
-      "a": 0,
-      "art": "REG"
-    },
-    "17419": {
-      "h": 15,
-      "a": 0,
-      "art": "REG"
-    },
-    "17423": {
-      "h": 20,
-      "a": 0,
-      "art": "REG"
-    },
-    "17424": {
-      "h": 18,
-      "a": 0,
-      "art": "REG"
-    },
-    "17425": {
-      "h": 18,
-      "a": 0,
-      "art": "REG"
-    },
-    "17430": {
-      "h": 16,
-      "a": 0,
-      "art": "REG"
-    },
-    "17431": {
-      "h": 20,
-      "a": 0,
-      "art": "REG"
-    },
-    "17432": {
-      "h": 20,
-      "a": 0,
-      "art": "REG"
-    }
-  }
+  "format": 2,
+  "aktualisiert": null,
+  "quelle": "wird von scripts/scrape.mjs befüllt",
+  "ergebnisse": {}
 }
