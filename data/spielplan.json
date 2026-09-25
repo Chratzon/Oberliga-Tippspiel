@@ -2,7 +2,7 @@
   "saison": "2026/27",
   "liga": "DEB-Oberliga Süd",
   "modus": "Doppelrunde, 52 Spieltage, Hauptrunde bis 21.02.2027",
-  "standGeneriert": "2026-09-24",
+  "standGeneriert": "2026-09-25",
   "quelle": "hockeyweb.de",
   "teams": [
     {
@@ -246,14 +246,6 @@
       "gast": "hoechstadt"
     },
     {
-      "id": "17428",
-      "spieltag": 3,
-      "datum": "2026-09-25",
-      "zeit": "19:30",
-      "heim": "selb",
-      "gast": "riessersee"
-    },
-    {
       "id": "17437",
       "datum": "2026-09-25",
       "zeit": "19:30",
@@ -300,6 +292,14 @@
       "heim": "kaufbeuren",
       "gast": "erding",
       "spieltag": 3
+    },
+    {
+      "id": "17428",
+      "spieltag": 3,
+      "datum": "2026-09-25",
+      "zeit": "19:45",
+      "heim": "selb",
+      "gast": "riessersee"
     },
     {
       "id": "17441",
@@ -1758,19 +1758,19 @@
       "spieltag": 29
     },
     {
+      "id": "17628",
+      "datum": "2026-12-22",
+      "zeit": "19:30",
+      "heim": "stuttgart",
+      "gast": "selb",
+      "spieltag": 30
+    },
+    {
       "id": "17632",
       "datum": "2026-12-23",
       "zeit": "19:30",
       "heim": "passau",
       "gast": "erding",
-      "spieltag": 30
-    },
-    {
-      "id": "17628",
-      "datum": "2026-12-23",
-      "zeit": "19:30",
-      "heim": "stuttgart",
-      "gast": "selb",
       "spieltag": 30
     },
     {
