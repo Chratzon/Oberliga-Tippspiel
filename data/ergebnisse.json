@@ -1,6 +1,6 @@
 {
   "format": 2,
-  "aktualisiert": "2026-09-25T20:28:04.379Z",
+  "aktualisiert": "2026-09-25T20:57:06.149Z",
   "quelle": "hockeyweb.de",
   "ergebnisse": {
     "17413": {
@@ -76,6 +76,11 @@
     "17427": {
       "h": 1,
       "a": 4,
+      "art": "REG"
+    },
+    "17428": {
+      "h": 4,
+      "a": 1,
       "art": "REG"
     },
     "17429": {
