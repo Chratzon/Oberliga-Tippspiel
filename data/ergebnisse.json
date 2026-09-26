@@ -1,6 +1,42 @@
 {
   "format": 2,
-  "aktualisiert": null,
-  "quelle": "wird von scripts/scrape.mjs befüllt",
-  "ergebnisse": {}
+  "aktualisiert": "2026-09-26T14:20:16.601Z",
+  "quelle": "hockeyweb.de",
+  "ergebnisse": {
+    "17415": {
+      "h": 2,
+      "a": 4,
+      "art": "REG"
+    },
+    "17416": {
+      "h": 2,
+      "a": 6,
+      "art": "REG"
+    },
+    "17421": {
+      "h": 5,
+      "a": 1,
+      "art": "REG"
+    },
+    "17422": {
+      "h": 2,
+      "a": 5,
+      "art": "REG"
+    },
+    "17427": {
+      "h": 1,
+      "a": 4,
+      "art": "REG"
+    },
+    "17428": {
+      "h": 4,
+      "a": 1,
+      "art": "REG"
+    },
+    "17437": {
+      "h": 2,
+      "a": 1,
+      "art": "REG"
+    }
+  }
 }
