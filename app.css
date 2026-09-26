@@ -555,3 +555,109 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.
 .knopf-aktualisieren.ist-laedt svg { animation: drehen 0.9s linear infinite; }
 
 @keyframes drehen { to { transform: rotate(360deg); } }
+
+/* ---------- Spielnummer ---------- */
+
+.spiel-nr {
+  font-size: 0.64rem; color: var(--grau-hell); font-weight: 500;
+  font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
+}
+.spiel-kopf .anpfiff { margin-left: auto; }
+
+/* ---------- Tipp löschen ---------- */
+
+.tipp-weg {
+  padding: 3px 10px; border-radius: 999px;
+  border: 1px solid #3D5466; background: transparent;
+  color: #8FA9BA; font-size: 0.72rem; font-weight: 600;
+}
+.tipp-weg:hover { color: #F2A0A8; border-color: #F2A0A8; }
+.tipp-fuss .tipp-weg { margin-left: auto; }
+.tipp-gesperrt .tipp-weg { margin-left: auto; }
+.tipp-gesperrt .punkte { margin-left: 0; }
+
+/* ---------- Tipps der Gruppe ---------- */
+
+.gruppentipps {
+  border-top: 1px solid var(--grau-hell);
+  padding: 4px 12px 8px;
+}
+.gruppentipps ul { list-style: none; margin: 0; padding: 0; }
+.gruppentipps li {
+  display: grid; grid-template-columns: 1fr auto 34px;
+  align-items: center; gap: 10px;
+  padding: 5px 0; font-size: 0.82rem;
+  border-bottom: 1px solid rgba(124, 147, 163, 0.16);
+}
+.gruppentipps li:last-child { border-bottom: none; }
+.gruppentipps li.bin-ich .gt-name { font-weight: 700; color: var(--blaulinie); }
+.gt-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gt-tipp { color: var(--grau); font-variant-numeric: tabular-nums; }
+.gt-punkte {
+  text-align: right; font-weight: 700;
+  font-variation-settings: "wdth" 115; font-variant-numeric: tabular-nums;
+}
+.gt-punkte.ist-null { color: var(--grau-hell); font-weight: 500; }
+.gt-leer { margin: 6px 0; font-size: 0.8rem; color: var(--grau); }
+
+/* ---------- Punkte-Aufschlüsselung ---------- */
+
+body.blatt-offen { overflow: hidden; }
+
+.detail {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(11, 15, 19, 0.55);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+
+.detail-blatt {
+  width: 100%; max-width: 560px;
+  max-height: 86dvh; overflow-y: auto;
+  background: var(--eis); color: var(--puck);
+  border-radius: 14px 14px 0 0;
+  padding: 18px 16px calc(24px + env(safe-area-inset-bottom));
+}
+
+.detail-kopf { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.detail-kopf h2 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.detail-zu {
+  width: 34px; height: 34px; flex: 0 0 auto;
+  border: none; background: none; color: var(--grau);
+  font-size: 1.5rem; line-height: 1; border-radius: 6px;
+}
+
+.detail-summe { margin: 0 0 12px; font-size: 0.88rem; color: var(--grau); }
+.detail-summe b {
+  font-variation-settings: "wdth" 120;
+  font-size: 1.5rem; font-weight: 800; color: var(--puck);
+}
+
+.detail-verteilung {
+  list-style: none; margin: 0 0 14px; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.detail-verteilung li {
+  display: flex; gap: 5px; align-items: baseline;
+  background: var(--eis-hell); border: 1px solid var(--grau-hell);
+  border-radius: 999px; padding: 4px 11px; font-size: 0.78rem;
+}
+.detail-verteilung b { font-weight: 700; color: var(--blaulinie); }
+
+.detail-liste { list-style: none; margin: 0; padding: 0; }
+.detail-liste li {
+  display: grid; grid-template-columns: 1fr auto 32px;
+  align-items: center; gap: 10px;
+  padding: 9px 0; border-bottom: 1px solid var(--grau-hell);
+}
+.dt-paarung { display: block; font-weight: 600; font-size: 0.88rem; }
+.dt-datum { display: block; font-size: 0.72rem; color: var(--grau); }
+.dt-tipp { font-size: 0.82rem; color: var(--grau); font-variant-numeric: tabular-nums; }
+.dt-punkte {
+  text-align: right; font-weight: 800; font-size: 1.05rem;
+  font-variation-settings: "wdth" 115; font-variant-numeric: tabular-nums;
+}
+.dt-punkte.ist-null { color: var(--grau-hell); font-weight: 500; }
+.dt-leer { display: block; color: var(--grau); font-size: 0.85rem; }
+
+.rangliste li.ist-klickbar { cursor: pointer; }
+.rangliste li.ist-klickbar:hover { background: rgba(30, 95, 168, 0.06); border-radius: 6px; }

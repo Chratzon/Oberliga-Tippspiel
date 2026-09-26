@@ -21,6 +21,7 @@ let abmelden = [];
 let status = 'aus';          // aus | verbinde | verbunden | fehler
 let fehlerText = '';
 let sendeTimer = null;
+let eigeneAenderung = false;   // am Gerät getippt, noch nicht übertragen
 
 class RaumFehler extends Error {}
 
@@ -123,7 +124,8 @@ export const Sync = {
 
       if (rueckkehr && rueckkehr.user) await this.wiederherstellen();
 
-      await this.mitgliedschaftenSchreiben();
+      // Nichts hochschreiben: Beim Verbinden gilt der Stand aus der Datenbank.
+      // Geschrieben wird nur, was auf diesem Gerät geändert wurde.
       this.zuhoeren();
       ctx.beiStatus('');
     } catch (e) {
@@ -310,6 +312,34 @@ export const Sync = {
     return u.toString();
   },
 
+  /* ---------- Abgleich ---------- */
+
+  /* Wurde der eigene Eintrag anderswo geändert – auf einem zweiten Gerät
+     oder von Hand in der Firebase-Konsole –, gilt dieser Stand. */
+  entferntenStandUebernehmen(eigen) {
+    const entfernt = eigen.tipps || {};
+    const hierher = JSON.stringify(entfernt) !== JSON.stringify(ctx.zustand.tipps);
+    const nameAnders = eigen.name && eigen.name !== ctx.zustand.profil.name;
+    if (!hierher && !nameAnders) return;
+
+    ctx.zustand.tipps = entfernt;
+    if (nameAnders) ctx.zustand.profil.name = eigen.name;
+    ctx.beiUebernahme?.(hierher);
+  },
+
+  async raumEintragSchreiben(raumId) {
+    if (!db || status !== 'verbunden') return;
+    const { profil, tipps, raeume } = ctx.zustand;
+    const raum = raeume.find((r) => r.id === raumId);
+    if (!raum) return;
+    await fs.setDoc(fs.doc(db, 'raeume', raumId, 'teilnehmer', profil.id), {
+      name: profil.name || 'Unbenannt',
+      tipps,
+      nachweis: raum.nachweis,
+      aktualisiert: new Date().toISOString(),
+    });
+  },
+
   /* ---------- Schreiben und Zuhören ---------- */
 
   async mitgliedschaftenSchreiben() {
@@ -373,6 +403,15 @@ export const Sync = {
         const alle = {};
         schnappschuss.forEach((doc) => { alle[doc.id] = doc.data(); });
         ctx.zustand.fremdeTipps = alle;
+
+        const eigen = alle[ctx.zustand.profil.id];
+        if (!eigen) {
+          // Erster Besuch dieses Raums auf diesem Gerät: Eintrag anlegen.
+          this.raumEintragSchreiben(code).catch((e) => console.warn(e.message));
+        } else if (!eigeneAenderung) {
+          this.entferntenStandUebernehmen(eigen);
+        }
+
         ctx.beiAenderung();
       },
       (e) => {
@@ -389,13 +428,26 @@ export const Sync = {
     }, () => {}));
   },
 
+  /* Änderung am Gerät sofort übertragen (Name, Raumbeitritt). */
+  async aenderungSenden() {
+    eigeneAenderung = true;
+    try { await this.mitgliedschaftenSchreiben(); }
+    finally { eigeneAenderung = false; }
+  },
+
+  /* Wird bei jeder Änderung am Gerät aufgerufen. Bis sie übertragen ist,
+     überschreibt kein Stand aus der Datenbank die lokale Fassung. */
   tippSenden() {
+    eigeneAenderung = true;
     if (!db || status !== 'verbunden') return;
     clearTimeout(sendeTimer);
     sendeTimer = setTimeout(() => {
-      this.mitgliedschaftenSchreiben().catch((e) => {
-        ctx.beiStatus('Tipp nicht übertragen – ' + e.message, true);
-      });
+      this.mitgliedschaftenSchreiben()
+        .then(() => { eigeneAenderung = false; })
+        .catch((e) => {
+          eigeneAenderung = false;
+          ctx.beiStatus('Tipp nicht übertragen – ' + e.message, true);
+        });
     }, 1200);
   },
 };

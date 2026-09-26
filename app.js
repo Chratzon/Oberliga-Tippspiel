@@ -185,7 +185,52 @@ function zeichneTippen() {
   for (const spiel of spiele) liste.appendChild(spielKarte(spiel));
 }
 
-function spielKarte(spiel) {
+/* Alle Mitspieler des aktiven Raums, eigener Eintrag zuerst. */
+function alleTeilnehmer() {
+  return [
+    { id: zustand.profil.id, name: zustand.profil.name || 'Du', tipps: zustand.tipps, ich: true },
+    ...Object.entries(zustand.fremdeTipps)
+      .filter(([id]) => id !== zustand.profil.id)
+      .map(([id, w]) => ({ id, name: w.name || 'Unbenannt', tipps: w.tipps || {}, ich: false })),
+  ];
+}
+
+function tippText(t) {
+  return `${t.h}:${t.a}${t.art !== 'REG' ? ' ' + AUSGANG[t.art] : ''}`;
+}
+
+function tippLoeschen(spielId) {
+  delete zustand.tipps[spielId];
+  sichern();
+  Sync.tippSenden();
+  neuZeichnen();
+  toast('Tipp gelöscht');
+}
+
+/* Wie die Gruppe getippt hat – nur im Reiter Ergebnisse. */
+function gruppenTipps(spiel) {
+  const erg = ergebnisVon(spiel.id);
+  const reihen = alleTeilnehmer()
+    .map((t) => ({ ...t, tipp: t.tipps[spiel.id], punkte: punkteFuer(t.tipps[spiel.id], erg) }))
+    .filter((t) => t.tipp)
+    .sort((x, y) => (y.punkte ?? -1) - (x.punkte ?? -1) || x.name.localeCompare(y.name));
+
+  const el = document.createElement('div');
+  el.className = 'gruppentipps';
+  if (!reihen.length) {
+    el.innerHTML = '<p class="gt-leer">Niemand hat dieses Spiel getippt.</p>';
+    return el;
+  }
+  el.innerHTML = '<ul>' + reihen.map((r) => `
+    <li${r.ich ? ' class="bin-ich"' : ''}>
+      <span class="gt-name">${r.name}</span>
+      <span class="gt-tipp">${tippText(r.tipp)}</span>
+      <span class="gt-punkte${r.punkte ? '' : ' ist-null'}">${r.punkte ?? '–'}</span>
+    </li>`).join('') + '</ul>';
+  return el;
+}
+
+function spielKarte(spiel, optionen = {}) {
   const erg = ergebnisVon(spiel.id);
   const tipp = zustand.tipps[spiel.id];
   const gesperrt = istGesperrt(spiel);
@@ -202,6 +247,7 @@ function spielKarte(spiel) {
       <span>${datumKurz(spiel.datum)}</span>
       ${erg ? '<span class="marke">Endstand</span>' : ''}
       <span class="anpfiff">${erg ? '' : zeitText}</span>
+      <span class="spiel-nr" title="Spielnummer">#${spiel.id}</span>
     </div>
     <div class="paarung">
       <div class="mannschaft heim">${wappen(h)}<span class="ms-name">${h.name}</span></div>
@@ -212,7 +258,8 @@ function spielKarte(spiel) {
       <div class="mannschaft gast"><span class="ms-name">${g.name}</span>${wappen(g)}</div>
     </div>`;
 
-  karte.appendChild(gesperrt ? gesperrtLeiste(tipp, punkte) : tippFeld(spiel, tipp));
+  karte.appendChild(gesperrt ? gesperrtLeiste(spiel, tipp, punkte) : tippFeld(spiel, tipp));
+  if (optionen.gruppe) karte.appendChild(gruppenTipps(spiel));
   return karte;
 }
 
@@ -221,12 +268,21 @@ function punkteChip(punkte) {
   return `<span class="punkte ${punkte === 0 ? 'ist-null' : ''}">${punkte} ${punkte === 1 ? 'Punkt' : 'Punkte'}</span>`;
 }
 
-function gesperrtLeiste(tipp, punkte) {
+function gesperrtLeiste(spiel, tipp, punkte) {
   const el = document.createElement('div');
   el.className = 'tipp-gesperrt';
-  el.innerHTML = tipp
-    ? `<span>Dein Tipp: ${tipp.h}:${tipp.a}${tipp.art !== 'REG' ? ' (' + AUSGANG[tipp.art] + ')' : ''}</span>${punkteChip(punkte)}`
-    : '<span>Kein Tipp abgegeben</span>';
+  if (!tipp) {
+    el.innerHTML = '<span>Kein Tipp abgegeben</span>';
+    return el;
+  }
+  el.innerHTML = `<span>Dein Tipp: ${tippText(tipp)}</span>
+    <button type="button" class="tipp-weg" aria-label="Tipp löschen">Löschen</button>
+    ${punkteChip(punkte)}`;
+  el.querySelector('.tipp-weg').addEventListener('click', () => {
+    if (confirm('Diesen Tipp löschen? Das Spiel ist bereits angepfiffen, die Punkte dafür entfallen.')) {
+      tippLoeschen(spiel.id);
+    }
+  });
   return el;
 }
 
@@ -252,7 +308,12 @@ function tippFeld(spiel, tipp) {
       ${Object.entries(AUSGANG).map(([k, v]) =>
         `<button type="button" data-art="${k}" class="${wert.art === k ? 'ist-gewaehlt' : ''}">${v}</button>`).join('')}
     </div>
-    <div class="tipp-fuss"><span>${tipp ? 'Tipp gespeichert' : 'Noch nicht getippt'}</span></div>`;
+    <div class="tipp-fuss">
+      <span>${tipp ? 'Tipp gespeichert' : 'Noch nicht getippt'}</span>
+      <button type="button" class="tipp-weg" ${tipp ? '' : 'hidden'}>Löschen</button>
+    </div>`;
+
+  el.querySelector('.tipp-weg').addEventListener('click', () => tippLoeschen(spiel.id));
 
   const ausgabeH = el.querySelector('[data-feld="heim"]');
   const ausgabeG = el.querySelector('[data-feld="gast"]');
@@ -278,7 +339,8 @@ function tippFeld(spiel, tipp) {
     zustand.tipps[spiel.id] = neu;
     sichern();
     hinweis.textContent = 'Tipp gespeichert';
-    Sync.tippSenden(spiel.id, neu);
+    el.querySelector('.tipp-weg').hidden = false;
+    Sync.tippSenden();
   };
 
   el.querySelectorAll('[data-tor]').forEach((btn) => {
@@ -309,12 +371,7 @@ function aktiverRaum() {
 function zeichneRangliste() {
   const raum = aktiverRaum();
 
-  const teilnehmer = [
-    { id: zustand.profil.id, name: zustand.profil.name || 'Du', tipps: zustand.tipps, ich: true },
-    ...Object.entries(zustand.fremdeTipps)
-      .filter(([id]) => id !== zustand.profil.id)
-      .map(([id, w]) => ({ id, name: w.name || 'Unbenannt', tipps: w.tipps || {}, ich: false })),
-  ];
+  const teilnehmer = alleTeilnehmer();
 
   const gewertet = Object.keys(zustand.ergebnisse).length + Object.keys(zustand.eigeneKorrekturen).length;
 
@@ -344,7 +401,9 @@ function zeichneRangliste() {
   if (zeigen) {
     reihen.forEach((r, i) => {
       const li = document.createElement('li');
-      if (r.ich) li.className = 'bin-ich';
+      li.className = (r.ich ? 'bin-ich ' : '') + 'ist-klickbar';
+      li.tabIndex = 0;
+      li.setAttribute('role', 'button');
       li.innerHTML = `
         <span class="rang-platz">${i + 1}</span>
         <span>
@@ -352,12 +411,56 @@ function zeichneRangliste() {
           <span class="rang-detail">${r.getippt} getippt · ${r.treffer} Volltreffer</span>
         </span>
         <span class="rang-punkte">${r.punkte}</span>`;
+      const oeffnen = () => punkteDetailZeigen(r);
+      li.addEventListener('click', oeffnen);
+      li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); oeffnen(); } });
       liste.appendChild(li);
     });
   }
 
   $('#legende-liste').innerHTML = WERTUNG
     .map((w) => `<li><b>${w.punkte}</b><span>${w.text}</span></li>`).join('');
+}
+
+/* Aufschlüsselung: Woraus setzen sich die Punkte einer Person zusammen? */
+function punkteDetailZeigen(person) {
+  const zeilen = zustand.spielplan.spiele
+    .map((s) => ({ spiel: s, tipp: person.tipps[s.id], erg: ergebnisVon(s.id) }))
+    .filter((z) => z.tipp && z.erg)
+    .map((z) => ({ ...z, punkte: punkteFuer(z.tipp, z.erg) }))
+    .sort((x, y) => (y.spiel.datum + (y.spiel.zeit || '')).localeCompare(x.spiel.datum + (x.spiel.zeit || '')));
+
+  const summe = zeilen.reduce((s, z) => s + z.punkte, 0);
+  const verteilung = new Map();
+  for (const z of zeilen) verteilung.set(z.punkte, (verteilung.get(z.punkte) || 0) + 1);
+
+  $('#detail-name').textContent = person.name;
+  $('#detail-summe').innerHTML = `<b>${summe}</b> ${summe === 1 ? 'Punkt' : 'Punkte'} aus ${zeilen.length} `
+    + `${zeilen.length === 1 ? 'gewerteter Partie' : 'gewerteten Partien'}`;
+
+  $('#detail-verteilung').innerHTML = [...verteilung.entries()]
+    .sort((x, y) => y[0] - x[0])
+    .map(([p, n]) => `<li><b>${n}×</b><span>${p} ${p === 1 ? 'Punkt' : 'Punkte'}</span></li>`)
+    .join('') || '';
+
+  $('#detail-liste').innerHTML = zeilen.map((z) => `
+    <li>
+      <span class="dt-spiel">
+        <span class="dt-paarung">${team(z.spiel.heim).kurz} – ${team(z.spiel.gast).kurz}</span>
+        <span class="dt-datum">${datumKurz(z.spiel.datum)} · Endstand ${tippText(z.erg)}</span>
+      </span>
+      <span class="dt-tipp">${tippText(z.tipp)}</span>
+      <span class="dt-punkte${z.punkte ? '' : ' ist-null'}">${z.punkte}</span>
+    </li>`).join('')
+    || '<li class="dt-leer">Noch keine gewertete Partie.</li>';
+
+  $('#detail').hidden = false;
+  document.body.classList.add('blatt-offen');
+}
+
+function punkteDetailSchliessen() {
+  $('#detail').hidden = true;
+  document.body.classList.remove('blatt-offen');
 }
 
 /* ========== Ansicht: Ergebnisse ========== */
@@ -374,7 +477,7 @@ function zeichneErgebnisse() {
   const liste = $('#ergebnis-liste');
   liste.innerHTML = '';
   $('#erg-leer').hidden = mitErgebnis.length > 0;
-  for (const spiel of mitErgebnis) liste.appendChild(spielKarte(spiel));
+  for (const spiel of mitErgebnis) liste.appendChild(spielKarte(spiel, { gruppe: true }));
 }
 
 /* ========== Ansicht: Profil ========== */
@@ -600,7 +703,7 @@ function begruessungAnbinden() {
     if (!name) { toast('Bitte einen Namen eingeben'); return; }
     zustand.profil.name = name;
     sichern();
-    Sync.mitgliedschaftenSchreiben().catch(() => {});
+    Sync.aenderungSenden().catch(() => {});
     begruessungZeigen(false);
     zeige(zustand.raeume.length ? 'tippen' : 'profil');
     if (!zustand.raeume.length) toast('Jetzt noch einem Raum beitreten');
@@ -996,7 +1099,7 @@ async function start() {
     sichern();
     zeichneKonto();
     toast('Name gespeichert');
-    Sync.mitgliedschaftenSchreiben().catch(() => {});
+    Sync.aenderungSenden().catch(() => {});
   });
 
   begruessungAnbinden();
@@ -1004,6 +1107,10 @@ async function start() {
   passwortFelderAufwerten();
   installationAnbinden();
   aktualisierenAnbinden();
+
+  $('#detail-zu').addEventListener('click', punkteDetailSchliessen);
+  $('#detail').addEventListener('click', (e) => { if (e.target.id === 'detail') punkteDetailSchliessen(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') punkteDetailSchliessen(); });
 
   $('#btn-export').addEventListener('click', () => {
     const blob = new Blob([JSON.stringify({ profil: zustand.profil, tipps: zustand.tipps }, null, 2)],
@@ -1040,6 +1147,12 @@ async function start() {
       if (zustand.ansicht === 'profil') zeichneProfil();
     },
     beiStatus: syncBand,
+    beiUebernahme: (tippsGeaendert) => {
+      sichern();
+      kopfAktualisieren();
+      neuZeichnen();
+      if (tippsGeaendert) toast('Tipps von woanders übernommen');
+    },
   });
   await Sync.verbinden();
   sichern();
