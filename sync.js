@@ -159,7 +159,10 @@ export const Sync = {
     const anbieter = new authM.GoogleAuthProvider();
 
     if (ohneFenster()) {
-      await authM.linkWithRedirect(authObj.currentUser, anbieter);
+      // Ist das Konto bereits verknüpft, scheitert ein zweiter Versuch.
+      const schonVerknuepft = !authObj.currentUser.isAnonymous;
+      if (schonVerknuepft) await authM.signInWithRedirect(authObj, anbieter);
+      else await authM.linkWithRedirect(authObj.currentUser, anbieter);
       return null;                      // die Seite lädt neu
     }
 
@@ -176,8 +179,8 @@ export const Sync = {
         return null;
       }
 
-      const schonVergeben = ['auth/credential-already-in-use', 'auth/email-already-in-use']
-        .includes(e.code);
+      const schonVergeben = ['auth/credential-already-in-use', 'auth/email-already-in-use',
+        'auth/provider-already-linked'].includes(e.code);
       if (!schonVergeben) throw new RaumFehler(e.message);
     }
 
@@ -257,11 +260,20 @@ export const Sync = {
     }
 
     const nachweis = await nachweisBilden(id, passwort || '');
+    const eigenerPfad = fs.doc(db, 'raeume', id, 'teilnehmer', ctx.zustand.profil.id);
+
+    /* Gibt es hier schon einen Eintrag von uns – etwa nach einem
+       Gerätewechsel –, werden dessen Tipps übernommen statt überschrieben.
+       Der Beitritt ist damit zugleich der Weg zurück zu den eigenen Daten. */
+    const vorhanden = await fs.getDoc(eigenerPfad).catch(() => null);
+    const tipps = vorhanden?.exists()
+      ? { ...(vorhanden.data().tipps || {}), ...ctx.zustand.tipps }
+      : ctx.zustand.tipps;
 
     try {
-      await fs.setDoc(fs.doc(db, 'raeume', id, 'teilnehmer', ctx.zustand.profil.id), {
-        name: ctx.zustand.profil.name || 'Unbenannt',
-        tipps: ctx.zustand.tipps,
+      await fs.setDoc(eigenerPfad, {
+        name: ctx.zustand.profil.name || vorhanden?.data()?.name || 'Unbenannt',
+        tipps,
         nachweis,
         aktualisiert: new Date().toISOString(),
       });
@@ -283,9 +295,10 @@ export const Sync = {
 
     ctx.zustand.raeume.push(eintrag);
     ctx.zustand.profil.raum = id;
+    ctx.zustand.tipps = tipps;
     await this.nutzerAkteSchreiben();
     this.zuhoeren();
-    return eintrag;
+    return { ...eintrag, zurueckgeholt: Object.keys(tipps).length };
   },
 
   async raumVerlassen(id) {
@@ -371,8 +384,17 @@ export const Sync = {
   /* Was auf diesem Gerät schon getippt wurde, hat Vorrang. */
   async wiederherstellen() {
     if (!db) return null;
-    const schnappschuss = await fs.getDoc(fs.doc(db, 'nutzer', ctx.zustand.profil.id)).catch(() => null);
-    if (!schnappschuss || !schnappschuss.exists()) return null;
+    let schnappschuss = null;
+    try {
+      schnappschuss = await fs.getDoc(fs.doc(db, 'nutzer', ctx.zustand.profil.id));
+    } catch (e) {
+      // Meist eine fehlende Firestore-Regel für nutzer/{uid}. Sichtbar machen,
+      // statt den Nutzer ohne Erklärung vor der Begrüßung stehen zu lassen.
+      console.error('Profil konnte nicht geladen werden: ' + e.message);
+      ctx.beiStatus('Profil nicht lesbar – ' + e.message, true);
+      return null;
+    }
+    if (!schnappschuss.exists()) return null;
 
     const d = schnappschuss.data();
     ctx.zustand.tipps = { ...(d.tipps || {}), ...ctx.zustand.tipps };

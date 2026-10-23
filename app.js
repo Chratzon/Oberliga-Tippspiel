@@ -683,6 +683,17 @@ function syncBand(text, fehler = false) {
 /* ========== Begrüßung ========== */
 
 function begruessungZeigen(an) {
+  /* Schon mit Google angemeldet und trotzdem hier? Dann fehlt nur der Name.
+     Der Anmeldeknopf würde eine zweite Verknüpfung versuchen und scheitern. */
+  if (an && zustand.konto.angemeldet && !zustand.konto.anonym) {
+    $('#btn-start-google').hidden = true;
+    document.querySelector('.trenner').hidden = true;
+    const w = $('#willkommen-warnung');
+    w.hidden = false;
+    w.textContent = `Angemeldet${zustand.konto.email ? ' als ' + zustand.konto.email : ''}. `
+      + 'Sag noch, wie du in der Rangliste heißen sollst.';
+  }
+
   if (an && !Sync.verbunden()) {
     const w = $('#willkommen-warnung');
     w.hidden = false;
@@ -759,6 +770,7 @@ function raumFormulareAnbinden() {
     e.preventDefault();
     try {
       const r = await Sync.raumBeitreten($('#in-beitritt-name').value, $('#in-beitritt-pw').value);
+      if (r.zurueckgeholt) toast(`${r.zurueckgeholt} frühere Tipps zurückgeholt`);
       sichern();
       kopfAktualisieren();
       zeichneRaeume();
@@ -1161,6 +1173,15 @@ async function start() {
 
   aktualisierungUeberwachen();
   taktStarten();
+
+  /* Nach einer Google-Weiterleitung ist das Konto da, aber der Name kann
+     fehlen – etwa weil der Browserspeicher geleert wurde. Dann gilt der
+     Name aus dem Google-Konto, sonst landet man wieder auf der Begrüßung. */
+  if (!zustand.profil.name && zustand.konto.angemeldet && !zustand.konto.anonym) {
+    zustand.profil.name = zustand.konto.name || zustand.konto.email?.split('@')[0] || 'Unbenannt';
+    sichern();
+    Sync.aenderungSenden().catch(() => {});
+  }
 
   if (!zustand.profil.name) {
     begruessungZeigen(true);
