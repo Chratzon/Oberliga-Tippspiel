@@ -85,6 +85,32 @@
     </div>
   </section>
 
+  <!-- ===== Liga-Tabelle ===== -->
+  <section id="view-liga" class="view" hidden>
+    <div class="rang-kopf">
+      <h2>Tabelle Oberliga Süd</h2>
+      <p id="liga-info" class="rang-info"></p>
+    </div>
+
+    <div class="liga-leiste">
+      <span class="liga-bilanz">S · OTS · OTN · N</span>
+      <span class="liga-sp">Sp</span>
+      <span class="liga-diff">Diff</span>
+      <span class="liga-pkt">Pkt</span>
+    </div>
+
+    <ol id="liga-tabelle" class="liga-tabelle"></ol>
+    <p id="liga-leer" class="leer" hidden>Noch keine gewerteten Partien – die Tabelle füllt sich mit den ersten Endständen.</p>
+
+    <p class="liga-fuss">
+      Berechnet aus den Endständen in dieser App: Sieg 3 Punkte, Sieg nach
+      Verlängerung oder Penalty 2, Niederlage nach Verlängerung oder Penalty 1.
+      Bei Punktgleichheit entscheidet hier die Tordifferenz, dann die erzielten
+      Tore – der offizielle Schlüssel des DEB zieht zuerst den direkten
+      Vergleich heran und kann im Einzelfall abweichen.
+    </p>
+  </section>
+
   <!-- ===== Ergebnisse ===== -->
   <section id="view-ergebnisse" class="view" hidden>
     <div class="rang-kopf kopf-mit-knopf">
@@ -199,6 +225,9 @@
   </button>
   <button class="reiter-knopf" data-view="tabelle" role="tab" aria-selected="false">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-6"/></svg>Rangliste
+  </button>
+  <button class="reiter-knopf" data-view="liga" role="tab" aria-selected="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 5H5v2a3 3 0 0 0 3 3M16 5h3v2a3 3 0 0 1-3 3"/><path d="M10 20h4M12 13v7"/></svg>Liga
   </button>
   <button class="reiter-knopf" data-view="ergebnisse" role="tab" aria-selected="false">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>Ergebnisse

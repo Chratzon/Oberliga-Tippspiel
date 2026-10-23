@@ -661,3 +661,59 @@ body.blatt-offen { overflow: hidden; }
 
 .rangliste li.ist-klickbar { cursor: pointer; }
 .rangliste li.ist-klickbar:hover { background: rgba(30, 95, 168, 0.06); border-radius: 6px; }
+
+/* ---------- Liga-Tabelle ---------- */
+
+.liga-leiste {
+  display: grid;
+  grid-template-columns: 24px 34px 1fr 26px 38px 34px;
+  gap: 8px; align-items: center;
+  padding: 0 4px 6px;
+  font-size: 0.66rem; font-weight: 600; color: var(--grau);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--grau-hell);
+}
+.liga-leiste .liga-bilanz { grid-column: 3; }
+.liga-leiste .liga-sp, .liga-leiste .liga-diff, .liga-leiste .liga-pkt { text-align: right; }
+
+.liga-tabelle { list-style: none; margin: 0; padding: 0; }
+
+.liga-tabelle li {
+  display: grid;
+  grid-template-columns: 24px 34px 1fr 26px 38px 34px;
+  gap: 8px; align-items: center;
+  padding: 9px 4px;
+  border-bottom: 1px solid var(--grau-hell);
+}
+
+.liga-platz {
+  font-variation-settings: "wdth" 118;
+  font-weight: 800; font-size: 0.95rem; color: var(--grau);
+  font-variant-numeric: tabular-nums; text-align: center;
+}
+.liga-tabelle li:first-child .liga-platz { color: var(--gold); }
+
+.liga-team { min-width: 0; }
+.liga-name {
+  display: block; font-weight: 600; font-size: 0.88rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.liga-detail { display: block; font-size: 0.7rem; color: var(--grau); font-variant-numeric: tabular-nums; }
+
+.liga-sp, .liga-diff {
+  text-align: right; font-size: 0.8rem; color: var(--grau);
+  font-variant-numeric: tabular-nums;
+}
+.liga-pkt {
+  text-align: right;
+  font-variation-settings: "wdth" 120;
+  font-weight: 800; font-size: 1.15rem; font-variant-numeric: tabular-nums;
+}
+
+.liga-fuss {
+  font-size: 0.74rem; color: var(--grau); line-height: 1.5;
+  margin: 18px 0 30px; padding-top: 12px;
+  border-top: 1px solid var(--grau-hell);
+}
+
+.reiter-knopf { font-size: 0.64rem; }

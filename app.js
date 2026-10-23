@@ -480,6 +480,75 @@ function zeichneErgebnisse() {
   for (const spiel of mitErgebnis) liste.appendChild(spielKarte(spiel, { gruppe: true }));
 }
 
+/* ========== Ansicht: Liga-Tabelle ========== */
+
+/* Punktschlüssel der DEB-Oberliga: Sieg 3, Sieg nach Verlängerung oder
+   Penalty 2, Niederlage nach Verlängerung oder Penalty 1, sonst 0. */
+function ligaTabelle() {
+  const zeilen = new Map(zustand.spielplan.teams.map((t) => [t.id,
+    { id: t.id, sp: 0, s: 0, ots: 0, otn: 0, n: 0, tore: 0, gegen: 0, punkte: 0 }]));
+
+  for (const spiel of zustand.spielplan.spiele) {
+    const e = ergebnisVon(spiel.id);
+    if (!e) continue;
+    const heim = zeilen.get(spiel.heim);
+    const gast = zeilen.get(spiel.gast);
+    if (!heim || !gast) continue;
+
+    heim.sp++; gast.sp++;
+    heim.tore += e.h; heim.gegen += e.a;
+    gast.tore += e.a; gast.gegen += e.h;
+
+    const sieger = e.h > e.a ? heim : gast;
+    const verlierer = e.h > e.a ? gast : heim;
+
+    if (e.art === 'REG') {
+      sieger.s++; sieger.punkte += 3;
+      verlierer.n++;
+    } else {
+      sieger.ots++; sieger.punkte += 2;
+      verlierer.otn++; verlierer.punkte += 1;
+    }
+  }
+
+  const diff = (z) => z.tore - z.gegen;
+  return [...zeilen.values()].sort((x, y) =>
+    y.punkte - x.punkte || diff(y) - diff(x) || y.tore - x.tore
+    || team(x.id).name.localeCompare(team(y.id).name));
+}
+
+function zeichneLiga() {
+  const reihen = ligaTabelle();
+  const partien = reihen.reduce((s, z) => s + z.sp, 0) / 2;
+
+  $('#liga-info').textContent = partien
+    ? `${partien} ${partien === 1 ? 'gewertete Partie' : 'gewertete Partien'}`
+      + (zustand.standDaten ? ` · Stand ${vorWieLangem(zustand.standDaten)}` : '')
+    : 'Noch keine Endstände';
+
+  const liste = $('#liga-tabelle');
+  liste.innerHTML = '';
+  $('#liga-leer').hidden = partien > 0;
+  if (!partien) return;
+
+  reihen.forEach((z, i) => {
+    const t = team(z.id);
+    const d = z.tore - z.gegen;
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <span class="liga-platz">${i + 1}</span>
+      ${wappen(t)}
+      <span class="liga-team">
+        <span class="liga-name">${t.name}</span>
+        <span class="liga-detail">${z.s} · ${z.ots} · ${z.otn} · ${z.n} &nbsp;|&nbsp; ${z.tore}:${z.gegen}</span>
+      </span>
+      <span class="liga-sp">${z.sp}</span>
+      <span class="liga-diff">${d > 0 ? '+' : ''}${d}</span>
+      <span class="liga-pkt">${z.punkte}</span>`;
+    liste.appendChild(li);
+  });
+}
+
 /* ========== Ansicht: Profil ========== */
 
 function zeichneKonto() {
@@ -663,6 +732,7 @@ function zeige(name) {
   }
   if (name === 'tippen') zeichneTippen();
   if (name === 'tabelle') zeichneRangliste();
+  if (name === 'liga') zeichneLiga();
   if (name === 'ergebnisse') zeichneErgebnisse();
   if (name === 'profil') zeichneProfil();
   window.scrollTo({ top: 0 });
@@ -887,6 +957,7 @@ async function spieldatenErneuern() {
 function neuZeichnen() {
   if (zustand.ansicht === 'tippen') zeichneTippen();
   if (zustand.ansicht === 'tabelle') zeichneRangliste();
+  if (zustand.ansicht === 'liga') zeichneLiga();
   if (zustand.ansicht === 'ergebnisse') zeichneErgebnisse();
 }
 
