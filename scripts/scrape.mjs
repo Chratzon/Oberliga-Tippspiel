@@ -152,19 +152,41 @@ async function seiteHolen(pfad, seite) {
   return antwort.text();
 }
 
-async function alleBloecke(pfad) {
+/* Welche Seitenzahlen verlinkt die Seite selbst? Wir folgen ihrer eigenen
+   Blätterlogik, statt Zahlen hochzuzählen: Der Spielplan blättert vorwärts
+   durch kommende Spielwochen, die Ergebnisseite rückwärts durch vergangene,
+   und ihre Nummerierung ist nicht fortlaufend. */
+export function seitenzahlenAus(html, pfad) {
+  const muster = new RegExp(`/oberliga/${pfad}/[^"'\\s>]*?[?&]page=(\\d+)`, 'g');
+  return [...new Set([...html.matchAll(muster)].map((m) => Number(m[1])))]
+    .filter((n) => n >= 1 && n <= 999);
+}
+
+async function alleBloecke(pfad, maxSeiten = SEITEN) {
   const gesammelt = [];
   const gesehen = new Set();
-  for (let seite = 1; seite <= SEITEN; seite++) {
+  const besucht = new Set();
+  const warteschlange = [1];
+
+  while (warteschlange.length && besucht.size < maxSeiten) {
+    const seite = warteschlange.shift();
+    if (besucht.has(seite)) continue;
+    besucht.add(seite);
+
     let html;
     try { html = await seiteHolen(pfad, seite); }
-    catch (e) { console.warn(`  Seite ${seite} übersprungen: ${e.message}`); break; }
+    catch (e) { console.warn(`  Seite ${seite} übersprungen: ${e.message}`); continue; }
 
     const neu = bloeckeZerlegen(html).filter((b) => !gesehen.has(b.id));
-    if (neu.length === 0) break;
     neu.forEach((b) => gesehen.add(b.id));
     gesammelt.push(...neu);
     console.log(`  ${pfad} Seite ${seite}: ${neu.length} Partien`);
+
+    /* Eine leere Seite ist kein Abbruchgrund – die laufende Spielwoche hat
+       noch keine Ergebnisse, die Wochen davor sehr wohl. */
+    for (const n of seitenzahlenAus(html, pfad)) {
+      if (!besucht.has(n) && !warteschlange.includes(n)) warteschlange.push(n);
+    }
     await warte(PAUSE_MS);
   }
   return gesammelt;
@@ -222,7 +244,7 @@ async function spieltagModus() {
   }
   console.log('Fällig: ' + faellig.map((t) => `${t.datum} (${t.offen} offen)`).join(', '));
 
-  const ergBloecke = await alleBloecke('ergebnisse');
+  const ergBloecke = await alleBloecke('ergebnisse', 3);
   const alle = new Map((plan.spiele || []).map((sp) => [sp.id, sp]));
   const { gefunden, abgelehnt } = ergebnisseAuswerten(ergBloecke, alle, jetzt);
 

@@ -4,7 +4,7 @@
  *   node scripts/test-parser.mjs
  */
 
-import { bloeckeZerlegen, ergebnisAus, zeitAus, anpfiffMs, faelligeTage } from './scrape.mjs';
+import { bloeckeZerlegen, ergebnisAus, zeitAus, anpfiffMs, faelligeTage, seitenzahlenAus } from './scrape.mjs';
 
 // [slug, zeit, endstand, drittel1, drittel2, drittel3, zusatz, erwartet]
 const SPIELE = [
@@ -96,6 +96,23 @@ console.log('\nWann wird abgefragt? (Sonntag 20.09.: Spiele 15:00 bis 18:00)');
   pruefe(faellig('01:30', {}, '2026-09-21'), 'Montag 01:30 – Nachzügler noch offen: Abruf');
   pruefe(!faellig('23:00', {}, '2026-09-21'), 'Montag 23:00 – über 30 Std. her: aufgeben, Nachtlauf übernimmt');
   pruefe(!faelligeTage([], {}, Date.now()).length, 'Tag ohne Spiele: kein Abruf');
+}
+
+console.log('\nBlätterlogik: verlinkte Seitenzahlen erkennen');
+{
+  const erg = `<a href="/oberliga/ergebnisse/s%C3%BCd?page=5">Vorherige</a>
+               <a href="/oberliga/ergebnisse/s%C3%BCd">Aktuell</a>
+               <a href="/oberliga/spielplan/s%C3%BCd">Spielplan</a>`;
+  const z = seitenzahlenAus(erg, 'ergebnisse');
+  pruefe(z.length === 1 && z[0] === 5, 'Ergebnisseite: findet nur die eigene Seite 5, nicht den Spielplan');
+
+  const plan = `<a href="/oberliga/spielplan/s%C3%BCd?page=2">Nächste</a>
+                <a href="/oberliga/spielplan/s%C3%BCd?page=2">Nächste</a>`;
+  const p = seitenzahlenAus(plan, 'spielplan');
+  pruefe(p.length === 1 && p[0] === 2, 'Spielplan: doppelte Links zählen einmal');
+
+  pruefe(seitenzahlenAus('<a href="/oberliga/ergebnisse/s%C3%BCd">x</a>', 'ergebnisse').length === 0,
+    'Seite ohne Blätterlink liefert nichts');
 }
 
 console.log(fehler ? `\n${fehler} Fehler.` : '\nAlles bestanden.');

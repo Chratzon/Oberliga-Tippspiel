@@ -134,6 +134,14 @@
   ],
   "spiele": [
     {
+      "id": "17414",
+      "spieltag": 1,
+      "datum": "2026-09-17",
+      "zeit": "19:30",
+      "heim": "kaufbeuren",
+      "gast": "badtoelz"
+    },
+    {
       "id": "17429",
       "spieltag": 1,
       "datum": "2026-09-18",
@@ -183,7 +191,7 @@
     },
     {
       "id": "17419",
-      "spieltag": 1,
+      "spieltag": 2,
       "datum": "2026-09-20",
       "zeit": "15:00",
       "heim": "heilbronn",
@@ -243,7 +251,7 @@
       "zeit": "19:30",
       "heim": "stuttgart",
       "gast": "hoechstadt",
-      "spieltag": 2
+      "spieltag": 3
     },
     {
       "id": "17427",
@@ -299,7 +307,7 @@
       "zeit": "17:30",
       "heim": "riessersee",
       "gast": "heilbronn",
-      "spieltag": 3
+      "spieltag": 4
     },
     {
       "id": "17449",
@@ -355,7 +363,7 @@
       "zeit": "19:30",
       "heim": "heilbronn",
       "gast": "hoechstadt",
-      "spieltag": 4
+      "spieltag": 5
     },
     {
       "id": "17446",
@@ -411,7 +419,7 @@
       "zeit": "17:30",
       "heim": "stuttgart",
       "gast": "lindau",
-      "spieltag": 5
+      "spieltag": 6
     },
     {
       "id": "17445",
@@ -467,7 +475,7 @@
       "zeit": "19:30",
       "heim": "stuttgart",
       "gast": "fuessen",
-      "spieltag": 6
+      "spieltag": 7
     },
     {
       "id": "17466",
@@ -523,7 +531,7 @@
       "zeit": "15:00",
       "heim": "passau",
       "gast": "badtoelz",
-      "spieltag": 7
+      "spieltag": 8
     },
     {
       "id": "17470",
@@ -579,7 +587,7 @@
       "zeit": "19:30",
       "heim": "badtoelz",
       "gast": "peiting",
-      "spieltag": 8
+      "spieltag": 9
     },
     {
       "id": "17472",
@@ -635,7 +643,7 @@
       "zeit": "19:30",
       "heim": "badtoelz",
       "gast": "hoechstadt",
-      "spieltag": 9
+      "spieltag": 10
     },
     {
       "id": "17482",
@@ -691,7 +699,7 @@
       "zeit": "15:00",
       "heim": "heilbronn",
       "gast": "lindau",
-      "spieltag": 10
+      "spieltag": 11
     },
     {
       "id": "17492",
@@ -747,7 +755,7 @@
       "zeit": "19:30",
       "heim": "stuttgart",
       "gast": "heilbronn",
-      "spieltag": 11
+      "spieltag": 12
     },
     {
       "id": "17494",
@@ -803,7 +811,7 @@
       "zeit": "17:30",
       "heim": "selb",
       "gast": "stuttgart",
-      "spieltag": 12
+      "spieltag": 13
     },
     {
       "id": "17495",
@@ -859,7 +867,7 @@
       "zeit": "19:30",
       "heim": "selb",
       "gast": "peiting",
-      "spieltag": 13
+      "spieltag": 14
     },
     {
       "id": "17506",
@@ -915,7 +923,7 @@
       "zeit": "17:30",
       "heim": "riessersee",
       "gast": "selb",
-      "spieltag": 14
+      "spieltag": 15
     },
     {
       "id": "17508",
@@ -971,7 +979,7 @@
       "zeit": "19:30",
       "heim": "selb",
       "gast": "badtoelz",
-      "spieltag": 15
+      "spieltag": 16
     },
     {
       "id": "17522",
@@ -1027,7 +1035,7 @@
       "zeit": "15:00",
       "heim": "heilbronn",
       "gast": "tigers",
-      "spieltag": 16
+      "spieltag": 17
     },
     {
       "id": "17526",
@@ -1083,7 +1091,7 @@
       "zeit": "19:30",
       "heim": "selb",
       "gast": "hoechstadt",
-      "spieltag": 17
+      "spieltag": 18
     },
     {
       "id": "17539",
@@ -1139,7 +1147,7 @@
       "zeit": "15:00",
       "heim": "heilbronn",
       "gast": "selb",
-      "spieltag": 18
+      "spieltag": 19
     },
     {
       "id": "17537",
@@ -1195,7 +1203,7 @@
       "zeit": "19:30",
       "heim": "lindau",
       "gast": "hoechstadt",
-      "spieltag": 19
+      "spieltag": 20
     },
     {
       "id": "17545",
@@ -1251,7 +1259,7 @@
       "zeit": "19:30",
       "heim": "stuttgart",
       "gast": "passau",
-      "spieltag": 20
+      "spieltag": 21
     },
     {
       "id": "17558",
@@ -1307,7 +1315,7 @@
       "zeit": "17:30",
       "heim": "riessersee",
       "gast": "deggendorf",
-      "spieltag": 21
+      "spieltag": 22
     },
     {
       "id": "17556",
@@ -1363,7 +1371,7 @@
       "zeit": "19:30",
       "heim": "passau",
       "gast": "selb",
-      "spieltag": 22
+      "spieltag": 23
     },
     {
       "id": "17571",
@@ -1419,7 +1427,7 @@
       "zeit": "17:30",
       "heim": "selb",
       "gast": "fuessen",
-      "spieltag": 23
+      "spieltag": 24
     },
     {
       "id": "17582",
@@ -1475,7 +1483,7 @@
       "zeit": "19:30",
       "heim": "badtoelz",
       "gast": "peiting",
-      "spieltag": 24
+      "spieltag": 25
     },
     {
       "id": "17583",
@@ -1531,7 +1539,7 @@
       "zeit": "19:30",
       "heim": "riessersee",
       "gast": "lindau",
-      "spieltag": 25
+      "spieltag": 26
     },
     {
       "id": "17601",
@@ -1587,7 +1595,7 @@
       "zeit": "16:00",
       "heim": "lindau",
       "gast": "tigers",
-      "spieltag": 26
+      "spieltag": 27
     },
     {
       "id": "17611",
@@ -1643,7 +1651,7 @@
       "zeit": "19:30",
       "heim": "stuttgart",
       "gast": "deggendorf",
-      "spieltag": 27
+      "spieltag": 28
     },
     {
       "id": "17607",
@@ -1699,7 +1707,7 @@
       "zeit": "15:30",
       "heim": "badtoelz",
       "gast": "passau",
-      "spieltag": 28
+      "spieltag": 29
     },
     {
       "id": "17623",
@@ -1755,7 +1763,7 @@
       "zeit": "19:30",
       "heim": "stuttgart",
       "gast": "selb",
-      "spieltag": 29
+      "spieltag": 30
     },
     {
       "id": "17632",
@@ -1811,7 +1819,7 @@
       "zeit": "17:30",
       "heim": "riessersee",
       "gast": "heilbronn",
-      "spieltag": 30
+      "spieltag": 31
     },
     {
       "id": "17621",
@@ -1867,7 +1875,7 @@
       "zeit": "18:00",
       "heim": "fuessen",
       "gast": "badtoelz",
-      "spieltag": 31
+      "spieltag": 32
     },
     {
       "id": "17646",
@@ -1923,7 +1931,7 @@
       "zeit": "19:30",
       "heim": "badtoelz",
       "gast": "stuttgart",
-      "spieltag": 32
+      "spieltag": 33
     },
     {
       "id": "17645",
@@ -1979,7 +1987,7 @@
       "zeit": "17:30",
       "heim": "stuttgart",
       "gast": "heilbronn",
-      "spieltag": 33
+      "spieltag": 34
     },
     {
       "id": "17636",
@@ -2035,7 +2043,7 @@
       "zeit": "19:30",
       "heim": "riessersee",
       "gast": "lindau",
-      "spieltag": 34
+      "spieltag": 35
     },
     {
       "id": "17667",
@@ -2091,7 +2099,7 @@
       "zeit": "19:30",
       "heim": "fuessen",
       "gast": "peiting",
-      "spieltag": 35
+      "spieltag": 36
     },
     {
       "id": "17665",
@@ -2147,7 +2155,7 @@
       "zeit": "17:30",
       "heim": "selb",
       "gast": "lindau",
-      "spieltag": 36
+      "spieltag": 37
     },
     {
       "id": "17662",
@@ -2203,7 +2211,7 @@
       "zeit": "19:30",
       "heim": "stuttgart",
       "gast": "fuessen",
-      "spieltag": 37
+      "spieltag": 38
     },
     {
       "id": "17681",
@@ -2259,7 +2267,7 @@
       "zeit": "17:30",
       "heim": "riessersee",
       "gast": "stuttgart",
-      "spieltag": 38
+      "spieltag": 39
     },
     {
       "id": "17675",
@@ -2315,7 +2323,7 @@
       "zeit": "19:30",
       "heim": "badtoelz",
       "gast": "fuessen",
-      "spieltag": 39
+      "spieltag": 40
     },
     {
       "id": "17690",
@@ -2371,7 +2379,7 @@
       "zeit": "19:30",
       "heim": "badtoelz",
       "gast": "riessersee",
-      "spieltag": 40
+      "spieltag": 41
     },
     {
       "id": "17703",
@@ -2427,7 +2435,7 @@
       "zeit": "17:30",
       "heim": "selb",
       "gast": "hoechstadt",
-      "spieltag": 41
+      "spieltag": 42
     },
     {
       "id": "17699",
@@ -2483,7 +2491,7 @@
       "zeit": "19:30",
       "heim": "heilbronn",
       "gast": "lindau",
-      "spieltag": 42
+      "spieltag": 43
     },
     {
       "id": "17711",
@@ -2539,7 +2547,7 @@
       "zeit": "15:30",
       "heim": "badtoelz",
       "gast": "heilbronn",
-      "spieltag": 43
+      "spieltag": 44
     },
     {
       "id": "17719",
@@ -2595,7 +2603,7 @@
       "zeit": "19:30",
       "heim": "heilbronn",
       "gast": "stuttgart",
-      "spieltag": 44
+      "spieltag": 45
     },
     {
       "id": "17726",
@@ -2651,7 +2659,7 @@
       "zeit": "19:30",
       "heim": "kaufbeuren",
       "gast": "heilbronn",
-      "spieltag": 45
+      "spieltag": 46
     },
     {
       "id": "17731",
@@ -2707,7 +2715,7 @@
       "zeit": "15:00",
       "heim": "heilbronn",
       "gast": "passau",
-      "spieltag": 46
+      "spieltag": 47
     },
     {
       "id": "17750",
@@ -2763,7 +2771,7 @@
       "zeit": "19:30",
       "heim": "selb",
       "gast": "heilbronn",
-      "spieltag": 47
+      "spieltag": 48
     },
     {
       "id": "17745",
@@ -2819,7 +2827,7 @@
       "zeit": "18:00",
       "heim": "badtoelz",
       "gast": "lindau",
-      "spieltag": 48
+      "spieltag": 49
     },
     {
       "id": "17752",
@@ -2875,7 +2883,7 @@
       "zeit": "19:30",
       "heim": "fuessen",
       "gast": "passau",
-      "spieltag": 49
+      "spieltag": 50
     },
     {
       "id": "17759",
@@ -2931,7 +2939,7 @@
       "zeit": "19:30",
       "heim": "selb",
       "gast": "lindau",
-      "spieltag": 50
+      "spieltag": 51
     },
     {
       "id": "17764",
@@ -2987,7 +2995,7 @@
       "zeit": "17:30",
       "heim": "riessersee",
       "gast": "stuttgart",
-      "spieltag": 51
+      "spieltag": 52
     },
     {
       "id": "17756",
