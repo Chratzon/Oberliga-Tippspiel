@@ -669,10 +669,128 @@ async function einladen(r) {
   }
 }
 
+/* ========== Werkstatt ========== */
+
+/* Versteckter Bereich im Profil: fünfmal auf die Datumszeile tippen,
+   dann Passwort. Das ist eine Bequemlichkeitssperre, kein Schutz – wer den
+   Quelltext liest, kommt daran vorbei. Was wirklich zählt, erzwingen die
+   Firestore-Regeln: Geschrieben wird ausschließlich in den eigenen Eintrag. */
+
+const WERKSTATT_SCHLUESSEL = 'bully.werkstatt';
+const WERKSTATT_VORGABE = '1947';
+let werkstattOffen = false;
+
+async function pruefsumme(text) {
+  const roh = new TextEncoder().encode('bully-werkstatt:' + text);
+  const puffer = await crypto.subtle.digest('SHA-256', roh);
+  return [...new Uint8Array(puffer)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function passwortStimmt(eingabe) {
+  const hinterlegt = localStorage.getItem(WERKSTATT_SCHLUESSEL)
+    || await pruefsumme(WERKSTATT_VORGABE);
+  return await pruefsumme(eingabe) === hinterlegt;
+}
+
+function werkstattSchalterAnbinden() {
+  const zeile = $('#daten-stand');
+  let zaehler = 0;
+  let uhr = null;
+
+  zeile.addEventListener('click', async () => {
+    if (werkstattOffen) return;
+    zaehler++;
+    clearTimeout(uhr);
+    uhr = setTimeout(() => { zaehler = 0; }, 2000);
+    if (zaehler < 5) return;
+
+    zaehler = 0;
+    const eingabe = prompt('Passwort');
+    if (eingabe === null) return;
+    if (!await passwortStimmt(eingabe)) { toast('Passwort stimmt nicht'); return; }
+
+    werkstattOffen = true;
+    zeichneProfil();
+    toast('Werkstatt offen');
+    $('#block-werkstatt').scrollIntoView({ block: 'center' });
+  });
+
+  $('#form-passwort').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const neu = $('#in-pw-neu').value;
+    if (neu.length < 3) { toast('Mindestens drei Zeichen'); return; }
+    localStorage.setItem(WERKSTATT_SCHLUESSEL, await pruefsumme(neu));
+    $('#in-pw-neu').value = '';
+    toast('Passwort geändert');
+  });
+}
+
+/* Tipps eines anderen Eintrags im Raum übernehmen – gedacht für das eigene
+   frühere Profil, dessen Kennung mit dem Browserspeicher verloren ging. */
+function zeichneWerkstatt() {
+  $('#block-werkstatt').hidden = !werkstattOffen;
+  if (!werkstattOffen) return;
+
+  $('#eigene-kennung').textContent = zustand.profil.id || '–';
+
+  const liste = $('#uebernahme-liste');
+  liste.innerHTML = '';
+
+  if (!Sync.verbunden() || !aktiverRaum()) {
+    liste.innerHTML = '<p class="block-text">Dafür musst du in einem Raum sein.</p>';
+    return;
+  }
+
+  const kandidaten = Object.entries(zustand.fremdeTipps)
+    .filter(([id]) => id !== zustand.profil.id)
+    .map(([id, w]) => ({
+      id,
+      name: w.name || 'Unbenannt',
+      anzahl: Object.keys(w.tipps || {}).length,
+      neu: Object.keys(w.tipps || {}).filter((sid) => !zustand.tipps[sid]).length,
+    }))
+    .filter((k) => k.anzahl > 0)
+    .sort((x, y) => y.neu - x.neu || y.anzahl - x.anzahl);
+
+  if (!kandidaten.length) {
+    liste.innerHTML = '<p class="block-text">Im Raum gibt es keinen weiteren Eintrag mit Tipps.</p>';
+    return;
+  }
+
+  for (const k of kandidaten) {
+    const zeile = document.createElement('div');
+    zeile.className = 'uebernahme-zeile';
+    zeile.innerHTML = `
+      <span>
+        <span class="ue-name">${k.name}</span>
+        <span class="ue-detail">${k.anzahl} Tipps · ${k.neu} davon fehlen dir</span>
+      </span>
+      <button type="button" class="knopf knopf-still" ${k.neu ? '' : 'disabled'}>Übernehmen</button>`;
+
+    zeile.querySelector('button').addEventListener('click', async () => {
+      if (!confirm(`${k.neu} Tipps von „${k.name}“ übernehmen? Deine eigenen bleiben unverändert.`)) return;
+      const quelle = zustand.fremdeTipps[k.id]?.tipps || {};
+      zustand.tipps = { ...quelle, ...zustand.tipps };   // eigene haben Vorrang
+      sichern();
+      try {
+        await Sync.aenderungSenden();
+        toast(`${k.neu} Tipps übernommen`);
+      } catch (e) {
+        toast('Übernommen, aber nicht übertragen – ' + e.message);
+      }
+      neuZeichnen();
+      zeichneProfil();
+    });
+
+    liste.appendChild(zeile);
+  }
+}
+
 function zeichneProfil() {
   $('#in-name').value = zustand.profil.name;
   zeichneKonto();
   zeichneRaeume();
+  zeichneWerkstatt();
   zeichneInstall();
 
   $('#hinweis-einrichtung').hidden = Boolean(FIREBASE_KONFIG && FIREBASE_KONFIG.projectId);
@@ -1189,6 +1307,7 @@ async function start() {
   raumFormulareAnbinden();
   passwortFelderAufwerten();
   installationAnbinden();
+  werkstattSchalterAnbinden();
   aktualisierenAnbinden();
 
   $('#detail-zu').addEventListener('click', punkteDetailSchliessen);

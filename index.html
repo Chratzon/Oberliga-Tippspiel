@@ -214,6 +214,30 @@
       <input id="datei-import" type="file" accept="application/json" hidden>
     </details>
 
+    <div class="block" id="block-werkstatt" hidden>
+      <h3>Werkstatt</h3>
+
+      <p class="block-text">
+        Tipps aus einem anderen Eintrag deines Raums in deinen eigenen holen.
+        Gedacht für ein früheres Profil, dessen Kennung verloren ging. Deine
+        jetzigen Tipps bleiben unverändert, es werden nur Lücken gefüllt.
+      </p>
+      <div id="uebernahme-liste" class="uebernahme-liste"></div>
+
+      <p class="werkstatt-kennung">
+        Deine Kennung: <code id="eigene-kennung"></code>
+      </p>
+
+      <form id="form-passwort" class="unterformular">
+        <label class="feld">
+          <span class="feld-label">Passwort der Werkstatt ändern</span>
+          <input id="in-pw-neu" type="password" minlength="3" placeholder="neues Passwort" autocomplete="new-password">
+          <span class="feld-hilfe">Gilt nur auf diesem Gerät. Nach einer Neuinstallation gilt wieder das voreingestellte.</span>
+        </label>
+        <button type="submit" class="knopf">Passwort speichern</button>
+      </form>
+    </div>
+
     <p id="daten-stand" class="daten-stand"></p>
   </section>
 
