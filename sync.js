@@ -122,7 +122,13 @@ export const Sync = {
       ctx.zustand.konto = this.kontoInfo();
       status = 'verbunden';
 
-      if (rueckkehr && rueckkehr.user) await this.wiederherstellen();
+      /* Nach einer Google-Weiterleitung – und immer dann, wenn dieses Gerät
+         noch keinen Raum kennt – den eigenen Stand aus der Datenbank holen.
+         Damit findet sich ein Gerät nach geleertem Browserspeicher selbst
+         wieder zurecht, sofern das Konto mit Google gesichert ist. */
+      if ((rueckkehr && rueckkehr.user) || !ctx.zustand.raeume.length) {
+        await this.wiederherstellen();
+      }
 
       // Nichts hochschreiben: Beim Verbinden gilt der Stand aus der Datenbank.
       // Geschrieben wird nur, was auf diesem Gerät geändert wurde.
@@ -426,12 +432,17 @@ export const Sync = {
         schnappschuss.forEach((doc) => { alle[doc.id] = doc.data(); });
         ctx.zustand.fremdeTipps = alle;
 
-        const eigen = alle[ctx.zustand.profil.id];
-        if (!eigen) {
-          // Erster Besuch dieses Raums auf diesem Gerät: Eintrag anlegen.
-          this.raumEintragSchreiben(code).catch((e) => console.warn(e.message));
-        } else if (!eigeneAenderung) {
-          this.entferntenStandUebernehmen(eigen);
+        try {
+          const eigen = alle[ctx.zustand.profil.id];
+          if (!eigen) {
+            // Erster Besuch dieses Raums auf diesem Gerät: Eintrag anlegen.
+            this.raumEintragSchreiben(id).catch((e) => console.warn(e.message));
+          } else if (!eigeneAenderung) {
+            this.entferntenStandUebernehmen(eigen);
+          }
+        } catch (e) {
+          // Ein Fehler hier darf die Anzeige nicht blockieren.
+          console.error('Abgleich: ' + e.message);
         }
 
         ctx.beiAenderung();
