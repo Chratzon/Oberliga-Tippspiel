@@ -2,7 +2,7 @@
   "saison": "2026/27",
   "liga": "DEB-Oberliga Süd",
   "modus": "Doppelrunde, 52 Spieltage, Hauptrunde bis 21.02.2027",
-  "standGeneriert": "2026-11-20",
+  "standGeneriert": "2026-11-21",
   "quelle": "hockeyweb.de",
   "teams": [
     {
@@ -1422,6 +1422,14 @@
       "spieltag": 23
     },
     {
+      "id": "17585",
+      "datum": "2026-12-06",
+      "zeit": "16:00",
+      "heim": "peiting",
+      "gast": "deggendorf",
+      "spieltag": 24
+    },
+    {
       "id": "17592",
       "datum": "2026-12-06",
       "zeit": "17:30",
@@ -1443,14 +1451,6 @@
       "zeit": "17:30",
       "heim": "tigers",
       "gast": "badtoelz",
-      "spieltag": 24
-    },
-    {
-      "id": "17585",
-      "datum": "2026-12-06",
-      "zeit": "18:00",
-      "heim": "peiting",
-      "gast": "deggendorf",
       "spieltag": 24
     },
     {
